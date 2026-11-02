@@ -1,0 +1,73 @@
+{
+  "timestamp": "2026-11-02T08:49:05.085Z",
+  "platform": "darwin",
+  "arch": "arm64",
+  "osRelease": "25.6.0",
+  "cpu": "Apple M1 Pro",
+  "memoryGB": 32,
+  "browser": "141.0.7390.37",
+  "headless": true,
+  "gpu": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (LLVM 10.0.0) (0x0000C0DE)), SwiftShader driver)",
+  "viewport": {
+    "width": 1440,
+    "height": 960,
+    "dpr": 1
+  },
+  "note": "Synthetic text/tool scenes; frame intervals include browser scheduling; not mixed-media or physical input latency acceptance.",
+  "results": [
+    {
+      "count": 100,
+      "edges": 99,
+      "loadMs": 32.5,
+      "panFrameMs": {
+        "p50": 16.699999999999818,
+        "p95": 33.40000000000009,
+        "p99": 33.40000000000009
+      },
+      "drawMs": {
+        "p50": 0.3999999761581421,
+        "p95": 0.5999999940395355
+      },
+      "overviewMs": 13.099999994039536,
+      "overviewVisible": 100,
+      "idleFrames": 0,
+      "textureBytes": 0
+    },
+    {
+      "count": 1000,
+      "edges": 2000,
+      "loadMs": 85,
+      "panFrameMs": {
+        "p50": 50,
+        "p95": 50.100000000000364,
+        "p99": 66.59999999999945
+      },
+      "drawMs": {
+        "p50": 1.4000000059604645,
+        "p95": 1.9000000059604645
+      },
+      "overviewMs": 6.4000000059604645,
+      "overviewVisible": 1000,
+      "idleFrames": 0,
+      "textureBytes": 0
+    },
+    {
+      "count": 10000,
+      "edges": 9999,
+      "loadMs": 117.19999998807907,
+      "panFrameMs": {
+        "p50": 50,
+        "p95": 66.70000000000073,
+        "p99": 83.40000000000146
+      },
+      "drawMs": {
+        "p50": 3.4000000059604645,
+        "p95": 4.300000011920929
+      },
+      "overviewMs": 29.19999998807907,
+      "overviewVisible": 10000,
+      "idleFrames": 0,
+      "textureBytes": 0
+    }
+  ]
+}

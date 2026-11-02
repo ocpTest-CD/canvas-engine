@@ -1,0 +1,204 @@
+.engine-host {
+  position: relative;
+  overflow: hidden;
+  touch-action: none;
+  outline: none;
+  --panel: #fffcf5;
+  color: #30362d;
+}
+.engine-host > canvas {
+  position: absolute;
+  inset: 0;
+}
+.engine-host > canvas {
+  position: absolute;
+  inset: 0;
+}
+.engine-overlay {
+  position: absolute;
+  z-index: 2;
+  transform-origin: top left;
+  border: 2px solid #d68a32;
+  border-radius: 18px;
+  padding: 46px 16px 18px;
+  background: var(--panel);
+  overflow: hidden;
+  box-shadow: 0 10px 40px #20201018;
+}
+.engine-overlay textarea {
+  resize: none;
+  border: 0;
+  outline: none;
+  background: transparent;
+  color: inherit;
+  font: 14px/1.65 system-ui;
+  width: 100%;
+  height: 100%;
+}
+.engine-overlay > div {
+  height: 100%;
+}
+.engine-overlay > div textarea {
+  height: 70%;
+}
+.overlay-close {
+  position: absolute;
+  right: 12px;
+  top: 8px;
+  font-size: 12px;
+  background: #e9bd7044;
+}
+.engine-overlay video,
+.engine-overlay img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+.engine-overlay audio {
+  width: 100%;
+  margin-top: 30px;
+}
+.engine-live {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  clip-path: inset(50%);
+  overflow: hidden;
+}
+
+/* Transient node chrome lives in screen coordinates, outside scene geometry. */
+.engine-floating {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  pointer-events: none;
+}
+.node-toolbar,
+.node-panel {
+  position: absolute;
+  pointer-events: auto;
+  box-sizing: border-box;
+  color: var(--ink, #30362d);
+  background: var(--panel, #fffcf5);
+  border: 1px solid var(--border, #dedacc);
+  box-shadow: 0 6px 22px #252a1b14;
+}
+.node-toolbar {
+  display: flex;
+  gap: 2px;
+  padding: 5px;
+  border-radius: 12px;
+  white-space: nowrap;
+}
+.node-toolbar::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -26px;
+  height: 26px;
+}
+.node-toolbar button,
+.node-toolbar summary {
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: 12px/1.2 system-ui;
+  padding: 9px 10px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+.node-toolbar button:hover,
+.node-toolbar summary:hover {
+  background: #e7b96833;
+}
+.node-toolbar button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.node-toolbar button:focus-visible,
+.node-panel :focus-visible {
+  outline: 2px solid #bd812f;
+  outline-offset: 2px;
+}
+.node-panel {
+  border-radius: 16px;
+  padding: 16px;
+  overflow: auto;
+  overscroll-behavior: contain;
+  touch-action: auto;
+}
+.node-panel[hidden],
+.node-toolbar[hidden] {
+  display: none;
+}
+.engine-overlay {
+  box-sizing: border-box;
+  padding: 38px 16px 16px;
+  border-radius: 14px;
+  z-index: 6;
+}
+.engine-overlay.media-overlay {
+  padding: 0;
+  background: #20231f;
+}
+.engine-overlay .overlay-close {
+  z-index: 2;
+  background: #fffcf5ed;
+  color: #30362d;
+  border: 0;
+  border-radius: 8px;
+  padding: 6px 10px;
+  cursor: pointer;
+}
+.engine-overlay textarea {
+  box-sizing: border-box;
+}
+.media-overlay video,
+.media-overlay img {
+  display: block;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .node-panel {
+    animation: node-panel-enter 130ms ease-out;
+  }
+  @keyframes node-panel-enter {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+}
+.node-toolbar-more {
+  position: relative;
+}
+.node-toolbar-more summary {
+  list-style: none;
+}
+.node-toolbar-more summary::-webkit-details-marker {
+  display: none;
+}
+.node-toolbar-more > div {
+  position: absolute;
+  right: 0;
+  top: 38px;
+  min-width: 108px;
+  padding: 5px;
+  background: var(--panel, #fffcf5);
+  border: 1px solid var(--border, #dedacc);
+  border-radius: 10px;
+  box-shadow: 0 6px 20px #252a1b18;
+}
+.node-toolbar-more > div button {
+  display: block;
+  width: 100%;
+  text-align: left;
+}
+.node-toolbar::after {
+  pointer-events: none;
+}
+.node-toolbar-more > div {
+  z-index: 2;
+}

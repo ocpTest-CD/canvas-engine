@@ -1,0 +1,86 @@
+{
+  "name": "@canvas-app/engine",
+  "version": "0.2.4",
+  "private": true,
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./style.css": "./dist/canvas-engine.css",
+    "./react": {
+      "types": "./dist/react.d.ts",
+      "import": "./dist/react.js"
+    },
+    "./core": {
+      "types": "./dist/core.d.ts",
+      "import": "./dist/core.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "CONTRIBUTING.md",
+    "CHANGELOG.md",
+    "docs",
+    "LICENSE"
+  ],
+  "peerDependencies": {
+    "pixi.js": "^8.22.0",
+    "rbush": "^4.0.1",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  },
+  "dependencies": {
+    "@types/rbush": "4.0.0"
+  },
+  "peerDependenciesMeta": {
+    "react": {
+      "optional": true
+    },
+    "react-dom": {
+      "optional": true
+    }
+  },
+  "license": "UNLICENSED",
+  "description": "Framework-optional canvas engine with a headless core, WebGL rendering and node-local editing.",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ocpTest-CD/canvas-engine.git"
+  },
+  "homepage": "https://github.com/ocpTest-CD/canvas-engine",
+  "bugs": {
+    "url": "https://github.com/ocpTest-CD/canvas-engine/issues"
+  },
+  "scripts": {
+    "dev": "vite --host 127.0.0.1",
+    "build": "tsc --noEmit && npm run build:engine && vite build",
+    "build:engine": "vite build --config vite.engine.config.ts && tsc -p tsconfig.engine.json",
+    "test": "vitest run",
+    "test:e2e": "playwright test",
+    "check:boundaries": "node scripts/check-boundaries.mjs",
+    "benchmark": "node benchmarks/run.mjs",
+    "preview": "vite preview --host 127.0.0.1",
+    "format": "prettier --write \"{src,examples,playground,tests}/**/*.{ts,tsx,css}\""
+  },
+  "devDependencies": {
+    "@playwright/test": "1.56.1",
+    "@types/react": "19.1.16",
+    "@types/react-dom": "19.1.9",
+    "prettier": "3.6.2",
+    "typescript": "5.9.3",
+    "vite": "6.4.5",
+    "vitest": "4.1.12",
+    "pixi.js": "8.22.0",
+    "rbush": "4.0.1",
+    "react": "19.1.1",
+    "react-dom": "19.1.1"
+  },
+  "overrides": {
+    "glob": "14.0.2",
+    "minimatch": "11.0.1"
+  }
+}

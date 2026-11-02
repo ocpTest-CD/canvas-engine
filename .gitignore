@@ -1,0 +1,16 @@
+node_modules/
+dist/
+site-dist/
+test-results/
+playwright-report/
+*.tgz
+.DS_Store
+.env
+.env.*
+!.env.example
+*.p12
+*.p8
+*.key
+*.pem
+artifacts/
+benchmarks/*.png
