@@ -8,7 +8,10 @@ import {
   type Change,
   type Snapshot,
   type Point,
+  type EngineEvents,
+  type EngineMetrics,
 } from "./document/model";
+import { EdgeIndex } from "./scene/edges";
 import { SpatialIndex, toScreen, zoomAt } from "./scene/geometry";
 import { Renderer } from "./rendering/renderer";
 import {
@@ -16,7 +19,12 @@ import {
   type NodeDefinition,
   type NodeAction,
 } from "./nodes/definition";
-import { Resources, type AssetResolver } from "./resources/resources";
+import {
+  Resources,
+  validateResourceOptions,
+  type AssetResolver,
+  type ResourceOptions,
+} from "./resources/resources";
 import { Overlays } from "./overlays/overlays";
 import { Interaction } from "./interaction/interaction";
 import { NodeCommands } from "./document/commands";
@@ -24,13 +32,15 @@ import { Floating } from "./overlays/floating";
 import { fitMedia, fitText } from "./layout/sizing";
 export interface Options {
   resolveAsset?: AssetResolver;
+  resources?: ResourceOptions;
   nodeActions?: (node: Node) => NodeAction[];
   nodePanel?: (node: Node, container: HTMLElement) => (() => void) | void;
   canConnect?: (a: Node, b: Node) => boolean;
 }
 export class CanvasEngine {
-  document = new Document();
+  document: Document;
   index = new SpatialIndex();
+  private edgeIndex = new EdgeIndex();
   camera: Camera = { x: -100, y: -100, zoom: 1 };
   selected = new Set<string>();
   selectedEdge?: string;
@@ -58,11 +68,21 @@ export class CanvasEngine {
   private listeners = new Map<string, Set<(value?: unknown) => void>>();
   private commands: NodeCommands;
   private live: HTMLDivElement;
-  metrics = { frames: 0, drawMs: 0, visible: 0, textures: 0, textureBytes: 0 };
+  metrics: EngineMetrics = {
+    frames: 0,
+    drawMs: 0,
+    visible: 0,
+    visibleEdges: 0,
+    textures: 0,
+    textureBytes: 0,
+  };
   private constructor(
     public host: HTMLElement,
     public options: Options,
   ) {
+    this.document = new Document({
+      canConnect: (_edge, from, to) => this.connectionAllowed(from, to),
+    });
     this.commands = new NodeCommands(this, (mapping) =>
       this.emit("nodesCloned", mapping),
     );
@@ -103,6 +123,7 @@ export class CanvasEngine {
         }
         this.applyChanges(changes, false);
       },
+      options.resources,
     );
     this.renderer = new Renderer(host, this.definitions, this.resources);
     this.overlays = new Overlays(
@@ -116,17 +137,32 @@ export class CanvasEngine {
         this.showNodePanel(id);
         this.requestRender();
       },
+      (error) => this.message(`编辑器清理失败: ${String(error)}`),
     );
-    this.document.onChange = (ids) => {
-      this.ranks = new Map(
-        [...this.document.nodes.keys()].map((id, order) => [id, order]),
-      );
+    this.document.onChange = (ids, detail) => {
+      if (detail.orderChanged)
+        this.ranks = new Map(
+          [...this.document.nodes.keys()].map((id, order) => [id, order]),
+        );
       if (this.panelId && !this.document.nodes.has(this.panelId))
         this.showNodePanel();
-      for (const id of ids) {
-        this.index.update(id, this.document.nodes.get(id));
+      if (detail.reset) {
+        this.index.rebuild(this.document.nodes.values());
+        this.edgeIndex.clear();
+      } else
+        for (const id of detail.geometry)
+          this.index.update(id, this.document.nodes.get(id));
+      const edgeIds = new Set(detail.edges);
+      for (const id of detail.geometry) {
         if (!this.document.nodes.has(id)) this.selected.delete(id);
+        for (const edge of this.document.incidentEdges(id)) edgeIds.add(edge);
       }
+      for (const id of edgeIds)
+        this.edgeIndex.update(
+          id,
+          this.document.edges.get(id),
+          this.document.nodes,
+        );
       if (this.selectedEdge && !this.document.edges.has(this.selectedEdge))
         this.selectedEdge = undefined;
       this.notify();
@@ -134,6 +170,9 @@ export class CanvasEngine {
     };
   }
   static async create(host: HTMLElement, options: Options = {}) {
+    validateResourceOptions(options.resources);
+    if (!host.isConnected || host.clientWidth <= 0 || host.clientHeight <= 0)
+      throw Error("画布容器必须已挂载且尺寸非零");
     const e = new CanvasEngine(host, options);
     try {
       await e.renderer.init();
@@ -165,14 +204,24 @@ export class CanvasEngine {
     this.definitions.set(type, definition);
     this.requestRender();
   }
+  private connectionAllowed(from: Node, to: Node) {
+    return (
+      this.definitions.get(from.type)?.ports?.output !== false &&
+      this.definitions.get(to.type)?.ports?.input !== false &&
+      (this.options.canConnect?.(from, to) ?? true)
+    );
+  }
   loadScene(raw: unknown) {
-    validate(raw);
+    const proposed = validate(raw);
+    const lookup = new Map(proposed.nodes.map((node) => [node.id, node]));
+    for (const edge of proposed.edges)
+      if (!this.connectionAllowed(lookup.get(edge.from)!, lookup.get(edge.to)!))
+        throw Error("连线不符合宿主规则");
     this.overlays.close(false);
     this.showNodePanel();
     this.hoveredId = undefined;
     this.interaction?.cancel();
     const s = this.document.load(raw);
-    this.index.rebuild(this.document.nodes.values());
     this.selected.clear();
     this.selectedEdge = undefined;
     this.resources.clear();
@@ -211,6 +260,9 @@ export class CanvasEngine {
       this.message(err instanceof Error ? err.message : String(err));
       throw err;
     }
+  }
+  invalidateAsset(id: string) {
+    this.resources.invalidate(id);
   }
   updateStatus(id: string, status: string) {
     this.document.updateStatus(id, status);
@@ -280,6 +332,16 @@ export class CanvasEngine {
     this.reorder(true);
     this.overlays.open(n, this.definitions.get(n.type));
     this.notify();
+  }
+  queryEdges(x: number, y: number, width: number, height: number) {
+    const ids = new Set(
+      this.edgeIndex.query(x, y, width, height).map((box) => box.id),
+    );
+    for (const id of this.preview.keys())
+      for (const edge of this.document.incidentEdges(id)) ids.add(edge);
+    return [...ids]
+      .map((id) => this.document.edges.get(id))
+      .filter((edge): edge is NonNullable<typeof edge> => !!edge);
   }
   hitNode(point: Point) {
     let best: Node | undefined,
@@ -458,13 +520,27 @@ export class CanvasEngine {
     );
     this.notify();
   }
-  on(event: string, handler: (value?: unknown) => void) {
+  on<K extends keyof EngineEvents>(
+    event: K,
+    handler: (value: EngineEvents[K]) => void,
+  ) {
     if (!this.listeners.has(event)) this.listeners.set(event, new Set());
-    this.listeners.get(event)!.add(handler);
-    return () => this.listeners.get(event)?.delete(handler);
+    const listener = handler as (value?: unknown) => void;
+    this.listeners.get(event)!.add(listener);
+    return () => this.listeners.get(event)?.delete(listener);
   }
-  private emit(event: string, value?: unknown) {
-    this.listeners.get(event)?.forEach((fn) => fn(value));
+  private emit<K extends keyof EngineEvents>(
+    event: K,
+    value?: EngineEvents[K],
+  ) {
+    for (const fn of [...(this.listeners.get(event) ?? [])]) {
+      try {
+        fn(value);
+      } catch (error) {
+        // Consumer callbacks must not interrupt an already committed transaction.
+        if (event !== "message") this.message(`事件监听失败: ${String(error)}`);
+      }
+    }
   }
   message(text: string) {
     this.live.textContent = text;
@@ -501,9 +577,16 @@ export class CanvasEngine {
         .map((b) => b.id),
     );
     for (const id of this.preview.keys()) ids.add(id);
-    const nodes = [...this.document.nodes.values()]
-      .filter((n) => ids.has(n.id))
-      .map((n) => this.preview.get(n.id) ?? n);
+    const nodes = [...ids]
+      .sort((a, b) => (this.ranks.get(a) ?? 0) - (this.ranks.get(b) ?? 0))
+      .map((id) => this.preview.get(id) ?? this.document.nodes.get(id))
+      .filter((node): node is Node => !!node);
+    const edges = this.queryEdges(
+      c.x - 20 / c.zoom,
+      c.y - 20 / c.zoom,
+      (this.host.clientWidth + 40) / c.zoom,
+      (this.host.clientHeight + 40) / c.zoom,
+    );
     const assets = new Set<string>();
     for (const n of nodes)
       if (n.assetId && c.zoom > 0.32) {
@@ -515,7 +598,7 @@ export class CanvasEngine {
       camera: c,
       nodes,
       all: this.document.nodes,
-      edges: this.document.edges.values(),
+      edges,
       selected: this.selected,
       selectedEdge: this.selectedEdge,
       preview: this.preview,
@@ -546,6 +629,7 @@ export class CanvasEngine {
       frames: this.metrics.frames + 1,
       drawMs: performance.now() - start,
       visible: nodes.length,
+      visibleEdges: edges.length,
       textures: this.resources.entries.size,
       textureBytes: this.resources.bytes,
     };

@@ -1,4 +1,4 @@
-# 接入指南（0.2.4）
+# 接入指南（0.3.0）
 
 适用对象：有 DOM 的 Web/WebView 产品，以及只使用文档核心的 JavaScript 宿主。先阅读[平台前置条件](platforms.md)。纯原生 Swift/Kotlin/Flutter 不能直接实例化当前 `CanvasEngine`。
 
@@ -13,12 +13,12 @@ npm run build:engine
 npm pack
 ```
 
-构建基线为 Node.js 22；锁文件固定开发依赖。生成的包名预计为 `canvas-app-engine-0.2.4.tgz`，以 `npm pack` 实际输出为准。仓库地址为 https://github.com/ocpTest-CD/canvas-engine；代码采用 [MIT 许可证](../LICENSE)，第三方依赖保留各自许可证。
+构建基线为 Node.js 22；锁文件固定开发依赖。生成的包名预计为 `canvas-app-engine-0.3.0.tgz`，以 `npm pack` 实际输出为准。仓库地址为 https://github.com/ocpTest-CD/canvas-engine；代码采用 [MIT 许可证](../LICENSE)，第三方依赖保留各自许可证。
 
 在有 ESM/CSS 支持的接入方工程中，安装本地包：
 
 ```sh
-npm install /absolute/path/to/canvas-app-engine-0.2.4.tgz pixi.js@8.22.0 rbush@4.0.1
+npm install /absolute/path/to/canvas-app-engine-0.3.0.tgz pixi.js@8.22.0 rbush@4.0.1
 # 仅 React 使用方需要：
 npm install react@19 react-dom@19
 ```
@@ -86,9 +86,9 @@ function addImage(file: File) {
 注意：
 
 - 每次解析都应返回拥有独立生命周期的引用，或由宿主正确引用计数。缩略图和完整预览会分别解析同一资源；不能在一处关闭时撤销另一处仍在使用的 URL。
-- 不要把临时 ObjectURL 当作持久 `assetId`；重新打开后必须重新解析。相同 ID 的字节变化建议分配新 ID，当前没有公开 `invalidateAsset` API。
+- 不要把临时 ObjectURL 当作持久 `assetId`；重新打开后必须重新解析。相同 ID 的字节变化后调用 `engine.invalidateAsset(id)` 使缓存失效并触发可见资源重读。
 - 图片通过 fetch 解码，跨域资源需要服务端允许 CORS。视频封面使用 video → Canvas，跨源视频需要额外验证；当前代码没有完整的跨源视频配置接口，优先由宿主获取 Blob 后返回 ObjectURL。
-- `AssetResolver` 目前没有 AbortSignal 参数。引擎会取消其内部解码，并处理失效结果；宿主自行发起的网络请求需要自行管理取消和超时。
+- `AssetResolver(id, context?)` 接收可选 `context.signal`。网络读取应传给 fetch；资源任务默认 30 秒超时，可通过 resources.timeoutMs 配置。宿主忽略取消时，引擎处理迟到结果，但不能停止宿主网络。
 - 删除节点不等于立即删除磁盘素材或清空所有缓存。缓存可保留到淘汰/清空/销毁；素材库的引用统计与物理删除属于宿主。
 - 普通视频节点显示封面，按需打开播放器；这不是多轨时间线或多视频同步播放引擎。
 
@@ -110,7 +110,7 @@ engine.applyChanges([{ kind: 'put', node: { ...current, text: '第一幕' } }]);
 
 `nodePanel(node, container)` 是创建引擎时注入的 DOM 挂载回调，可返回清理函数。它不是每次节点变化都会重新调用的响应式渲染函数；宿主需要自行订阅更新或使用 React Portal。更新前重新读取当前节点，避免旧闭包覆盖最新内容。
 
-工具栏通过 `nodeActions` 注入，连接业务限制通过 `canConnect` 注入。后者只约束用户拖拽连线，不能代替加载场景、程序写入和业务运行前的校验。完整签名见 [API](api.md)。
+工具栏通过 `nodeActions` 注入，连接业务限制通过 `canConnect` 注入。后者覆盖拖拽连线、加载、程序事务及受影响已有连线。业务执行时仍需验证权限和 DAG 等规则；动态策略变更与 undo/redo 不是权限隔离机制。完整签名见 [API](api.md)。
 
 ## 5. 保存、加载和撤销
 
@@ -128,7 +128,7 @@ engine.document.redo();
 
 `documentChange` 用于文档变化通知；`change` 还包括相机、选择和面板变化。保存视口时不能只监听前者。大型文档应合并/防抖序列化，不能每次 `metrics` 事件都导出完整 JSON。
 
-单次 `applyChanges([...])` 作为一个历史事务；`history=false` 和 `updateStatus` 可避免任务状态进入用户撤销栈。删除节点同时移除关联连线。`loadScene` 会清空历史；历史上限为 100 个事务。
+单次 `applyChanges([...])` 作为一个历史事务；`history=false` 和 `updateStatus` 可避免任务状态进入用户撤销栈；非历史节点增删或连线变更会清空历史，防止旧历史重放造成悬空关系。删除节点同时移除关联连线。`loadScene` 会清空历史；历史上限为 100 个事务。
 
 ## 6. React、Vue 和 SSR
 
@@ -148,9 +148,11 @@ Next.js/Nuxt 等 SSR 产品将 Web 引擎导入和实例化放在客户端生命
 | 自定义节点变成默认样式 | 是否在加载/使用场景前注册同名 NodeDefinition |
 | 菜单被裁剪 | 宿主 Portal 挂载位置和层级；不要修改文档几何来给菜单留位置 |
 | 关闭页面后仍占资源 | 是否调用 destroy、取消宿主监听、释放自有播放器/网络任务 |
-| 触屏无法按桌面手势缩放 | 当前没有完整双指手势实现，不能以 Pointer Events 支持推断移动端已验收 |
+| 触屏无法按桌面手势缩放 | 0.3 支持双指缩放/平移与空白处单指平移；检查事件拦截和 touch-action，触摸模拟通过不代表移动真机已验收 |
 | 图形上下文丢失 | 监听 message，保留可导出的文档并提供重新创建入口；不承诺自动完整恢复 |
 
 ## 8. 接入验收
 
 至少完成：创建/卸载、文本及中文输入、增删改和撤销、连线限制、保存重开、图片横竖比例、实际视频编码播放、资源缺失、快速切换场景、窗口变化、键盘焦点和错误恢复。随后按目标硬件测性能。原生端还必须完成[平台验收](platforms.md)，不能只用浏览器桌面测试替代。
+
+跨 WebView 的结构化读写可使用 [createSceneBridge](bridge.md)；原生文件、资源与认证仍在宿主中。

@@ -1,6 +1,11 @@
 import type { InteractionHost } from "./host";
-import { uid, type Point, type Node } from "../core/types";
-import { toWorld, zoomAt, segmentDistance } from "../scene/geometry";
+import { uid, type Point, type Node, type Camera } from "../core/types";
+import {
+  toWorld,
+  zoomAt,
+  segmentDistance,
+  pinchCamera,
+} from "../scene/geometry";
 type Gesture = {
   mode: "pan" | "drag" | "resize" | "box" | "connect";
   start: Point;
@@ -17,6 +22,8 @@ export class Interaction {
   private abort = new AbortController();
   private gesture?: Gesture;
   private space = false;
+  private touches = new Map<number, Point>();
+  private pinch?: { camera: Camera; points: [Point, Point] };
   constructor(private e: InteractionHost) {
     const h = e.host,
       signal = this.abort.signal;
@@ -49,6 +56,22 @@ export class Interaction {
     if ((ev.target as HTMLElement).closest(".engine-overlay,.engine-floating"))
       return;
     const e = this.e;
+    if (ev.pointerType === "touch") {
+      this.touches.set(ev.pointerId, this.point(ev));
+      if (this.touches.size >= 2) {
+        this.cancelGesture();
+        this.pinch = {
+          camera: { ...e.camera },
+          points: [...this.touches.values()].slice(0, 2) as [Point, Point],
+        };
+        e.gestureActive = true;
+        e.showNodePanel();
+        e.overlays.close();
+        e.host.setPointerCapture(ev.pointerId);
+        ev.preventDefault();
+        return;
+      }
+    }
     e.overlays.close();
     e.host.focus({ preventScroll: true });
     const screen = this.point(ev),
@@ -57,7 +80,8 @@ export class Interaction {
     let mode: Gesture["mode"] = "box",
       originals: Node[] = [];
     let from: string | undefined;
-    if (this.space || ev.button === 1) mode = "pan";
+    if (this.space || ev.button === 1 || (ev.pointerType === "touch" && !n))
+      mode = "pan";
     else if (n) {
       const tolerance = 10 / e.camera.zoom;
       if (
@@ -94,7 +118,13 @@ export class Interaction {
       }
     } else {
       let edgeId: string | undefined;
-      for (const edge of e.document.edges.values()) {
+      const tolerance = 7 / e.camera.zoom;
+      for (const edge of e.queryEdges(
+        p.x - tolerance,
+        p.y - tolerance,
+        tolerance * 2,
+        tolerance * 2,
+      )) {
         const a = e.document.nodes.get(edge.from)!,
           b = e.document.nodes.get(edge.to)!;
         if (
@@ -135,6 +165,19 @@ export class Interaction {
     ev.preventDefault();
   };
   private move = (ev: PointerEvent) => {
+    if (ev.pointerType === "touch" && this.touches.has(ev.pointerId)) {
+      this.touches.set(ev.pointerId, this.point(ev));
+      if (this.pinch && this.touches.size >= 2) {
+        this.e.camera = pinchCamera(
+          this.pinch.camera,
+          this.pinch.points,
+          [...this.touches.values()].slice(0, 2) as [Point, Point],
+        );
+        this.e.requestRender();
+        ev.preventDefault();
+        return;
+      }
+    }
     const g = this.gesture;
     if (!g) {
       this.e.hoverNode(this.hit(toWorld(this.point(ev), this.e.camera))?.id);
@@ -191,6 +234,17 @@ export class Interaction {
     e.requestRender();
   };
   private up = (ev: PointerEvent) => {
+    this.touches.delete(ev.pointerId);
+    if (this.pinch) {
+      if (this.touches.size < 2) {
+        this.pinch = undefined;
+        this.e.gestureActive = false;
+      }
+      if (this.e.host.hasPointerCapture(ev.pointerId))
+        this.e.host.releasePointerCapture(ev.pointerId);
+      this.e.notify();
+      return;
+    }
     const g = this.gesture;
     if (!g) return;
     const e = this.e;
@@ -237,6 +291,11 @@ export class Interaction {
     e.notify();
   };
   cancel = () => {
+    this.cancelGesture();
+    this.touches.clear();
+    this.pinch = undefined;
+  };
+  private cancelGesture = () => {
     const e = this.e;
     if (this.gesture?.mode === "pan") {
       e.camera.x = this.gesture.camera.x;

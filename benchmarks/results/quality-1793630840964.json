@@ -1,0 +1,135 @@
+{
+  "timestamp": "2026-11-02T14:47:20.921Z",
+  "version": "0.3.0",
+  "sourceHash": "0561a8f9d22126b911910f4e94de756ffc368fcf96619ffa59e9a67d277b1dcb",
+  "scriptHash": "2e02ff9f386a0bacf770a85dc250aaa0c8009d8a1230b070c55ca7b8263cf975",
+  "baseCommit": "d6ce1fc48bf68367b20a5872fb2fdafc2c949e0c",
+  "dirty": true,
+  "environment": {
+    "cpu": "Apple M1 Pro",
+    "memoryGiB": 32,
+    "os": "25.6.0",
+    "platform": "darwin",
+    "arch": "arm64",
+    "browser": "156.0.8078.79",
+    "gpu": "ANGLE (Apple, ANGLE Metal Renderer: Apple M1 Pro, Unspecified Version)",
+    "viewport": {
+      "width": 1440,
+      "height": 960,
+      "dpr": 1
+    },
+    "headless": true
+  },
+  "cpu": [
+    {
+      "count": 1000,
+      "samples": 100,
+      "p50": 0.0034999999999740794,
+      "p95": 0.0071659999999837964,
+      "p99": 0.007667000000026292
+    },
+    {
+      "count": 10000,
+      "samples": 100,
+      "p50": 0.0031250000000113687,
+      "p95": 0.0047089999999911925,
+      "p99": 0.005750000000034561
+    }
+  ],
+  "baseline": [
+    {
+      "count": 1000,
+      "samples": 100,
+      "p50": 0.7635000000000218,
+      "p95": 0.8381249999999909,
+      "p99": 1.0536670000000186
+    },
+    {
+      "count": 10000,
+      "samples": 100,
+      "p50": 8.055415999999923,
+      "p95": 9.132833000000005,
+      "p99": 11.99466700000005
+    }
+  ],
+  "scenes": [
+    {
+      "count": 100,
+      "edges": 99,
+      "frameMs": {
+        "p50": 16.699999999999818,
+        "p95": 16.700000000000273,
+        "p99": 16.800000000000068
+      },
+      "drawMs": {
+        "p50": 0.4000000059604645,
+        "p95": 1.199999988079071
+      },
+      "visible": 8,
+      "visibleEdges": 7,
+      "textureBytes": 0
+    },
+    {
+      "count": 1000,
+      "edges": 999,
+      "frameMs": {
+        "p50": 16.699999999999818,
+        "p95": 16.700000000000273,
+        "p99": 16.800000000000182
+      },
+      "drawMs": {
+        "p50": 1.0999999940395355,
+        "p95": 3
+      },
+      "visible": 48,
+      "visibleEdges": 40,
+      "textureBytes": 0
+    },
+    {
+      "count": 10000,
+      "edges": 9999,
+      "frameMs": {
+        "p50": 16.699999999999818,
+        "p95": 16.700000000000728,
+        "p99": 16.800000000000182
+      },
+      "drawMs": {
+        "p50": 1,
+        "p95": 2.699999988079071
+      },
+      "visible": 48,
+      "visibleEdges": 40,
+      "textureBytes": 0
+    }
+  ],
+  "mixed": {
+    "images": 40,
+    "videos": 10,
+    "playback": "poster frames; not concurrent playback",
+    "frameMs": {
+      "p50": 16.69999999999891,
+      "p95": 16.700000000000728,
+      "p99": 16.799999999999272
+    },
+    "drawMs": {
+      "p50": 1,
+      "p95": 2.9000000059604645
+    },
+    "visible": 40,
+    "visibleEdges": 0,
+    "textureBytes": 65986560
+  },
+  "idleFrames": 0,
+  "gates": {
+    "tenThousandSingleEditP95Under5ms": true,
+    "mixedFrameP95Under20ms": true,
+    "allDrawP95Under8ms": true,
+    "idleZero": true
+  },
+  "limitations": [
+    "Synthetic media, not a user production workload",
+    "Frame intervals include scheduler; not physical input latency",
+    "textureBytes is thumbnail accounting, not process/GPU memory",
+    "No hour-scale soak or mobile native hardware acceptance"
+  ]
+}

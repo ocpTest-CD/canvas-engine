@@ -60,3 +60,27 @@ export function segmentDistance(p: Point, a: Point, b: Point) {
     : 0;
   return Math.hypot(p.x - a.x - t * dx, p.y - a.y - t * dy);
 }
+
+/** Pure two-pointer camera transform. Coordinates are host-local CSS pixels. */
+export function pinchCamera(
+  start: Camera,
+  initial: [Point, Point],
+  current: [Point, Point],
+): Camera {
+  const center = (pair: [Point, Point]) => ({
+    x: (pair[0].x + pair[1].x) / 2,
+    y: (pair[0].y + pair[1].y) / 2,
+  });
+  const distance = (pair: [Point, Point]) =>
+    Math.hypot(pair[1].x - pair[0].x, pair[1].y - pair[0].y);
+  const anchor = toWorld(center(initial), start),
+    p = center(current);
+  const zoom = Math.max(
+    0.02,
+    Math.min(
+      4,
+      (start.zoom * distance(current)) / Math.max(1, distance(initial)),
+    ),
+  );
+  return { x: anchor.x - p.x / zoom, y: anchor.y - p.y / zoom, zoom };
+}

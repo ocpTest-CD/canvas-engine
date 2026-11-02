@@ -5,6 +5,7 @@ export interface Project {
 }
 export class AssetStore {
   blobs = new Map<string, Blob>();
+  private saves: Promise<void> = Promise.resolve();
   add(blob: Blob, id = crypto.randomUUID()) {
     this.blobs.set(id, blob);
     return id;
@@ -15,22 +16,46 @@ export class AssetStore {
     const url = URL.createObjectURL(blob);
     return { url, mime: blob.type, release: () => URL.revokeObjectURL(url) };
   };
-  async save(scene: Snapshot) {
-    const db = await open();
-    await new Promise<void>((resolve, reject) => {
-      const tx = db.transaction("projects", "readwrite");
-      tx.objectStore("projects").put(
-        { scene, assets: [...this.blobs] } satisfies Project,
-        "current",
+  save(scene: Snapshot) {
+    const snapshot = structuredClone(scene);
+    const needed = new Set(snapshot.nodes.map((node) => node.assetId));
+    const blobs = [...this.blobs].filter(([id]) => needed.has(id));
+    const persist = async () => {
+      // Store transferable bytes, not browser-specific Blob handles. Prepare before opening the transaction.
+      const assets = await Promise.all(
+        blobs.map(async ([id, blob]) => [
+          id,
+          { mime: blob.type, data: await blob.arrayBuffer() },
+        ]),
       );
-      tx.oncomplete = () => resolve();
-      tx.onerror = () => reject(tx.error);
-    });
-    db.close();
+      const db = await open();
+      try {
+        await new Promise<void>((resolve, reject) => {
+          const tx = db.transaction("projects", "readwrite");
+          tx.objectStore("projects").put(
+            { scene: snapshot, assets },
+            "current",
+          );
+          tx.oncomplete = () => resolve();
+          tx.onerror = () => reject(tx.error);
+          tx.onabort = () => reject(tx.error ?? new Error("保存事务已中止"));
+        });
+      } finally {
+        db.close();
+      }
+    };
+    this.saves = this.saves.catch(() => {}).then(persist);
+    return this.saves;
   }
   async load() {
     const db = await open();
-    const result = await new Promise<Project | undefined>((resolve, reject) => {
+    const result = await new Promise<
+      | {
+          scene: Snapshot;
+          assets: Array<[string, Blob | { mime: string; data: ArrayBuffer }]>;
+        }
+      | undefined
+    >((resolve, reject) => {
       const r = db
         .transaction("projects")
         .objectStore("projects")
@@ -39,7 +64,17 @@ export class AssetStore {
       r.onerror = () => reject(r.error);
     });
     db.close();
-    return result;
+    return result
+      ? {
+          scene: result.scene,
+          assets: result.assets.map(([id, asset]): [string, Blob] => [
+            id,
+            asset instanceof Blob
+              ? asset
+              : new Blob([asset.data], { type: asset.mime }),
+          ]),
+        }
+      : undefined;
   }
   async export(scene: Snapshot) {
     const needed = new Set(scene.nodes.map((n) => n.assetId).filter(Boolean));

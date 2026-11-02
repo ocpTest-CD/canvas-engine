@@ -2,7 +2,7 @@
 
 本地多模态画布引擎，TypeScript + PixiJS；节点内容直接展示，悬停操作位于上方，参数面板锚定下方。模型调用、密钥、文件存储和工作流执行由宿主提供。
 
-当前包版本 **0.2.4**，场景协议 **version 1**。这是可构建、打包与集成的开发版本，已提取为独立源码仓库，尚未发布 npm。本项目采用 [MIT 许可证](LICENSE) 开源；`private: true` 仅用于防止意外发布 npm，不限制 MIT 授予的使用权限。第三方依赖保留各自许可证。
+当前包版本 **0.3.0**，场景协议 **version 1**。这是可构建、打包与集成的开发版本，已提取为独立源码仓库，尚未发布 npm。本项目采用 [MIT 许可证](LICENSE) 开源；`private: true` 仅用于防止意外发布 npm，不限制 MIT 授予的使用权限。第三方依赖保留各自许可证。
 
 ## 接入与版本文档
 
@@ -11,6 +11,7 @@
 - [各端前置条件与接口](docs/platforms.md)：Web、Electron、Tauri、Apple/Android WebView、React Native/Flutter、服务端和纯原生边界。
 - [API 参考](docs/api.md)：当前实际入口、方法、事件和数据契约。
 - [CHANGELOG](CHANGELOG.md)：区分引擎变化与历史宿主版本。
+- [0.3.0 质量验收](docs/quality-0.3.md)：评分依据、已通过检查和剩余缺口。
 - [性能参数与证据](docs/performance.md)：50,000 节点/100,000 连线是格式校验上限，不是流畅规模承诺；96 MiB 是缩略图估算软预算。
 - [独立仓库交付边界](docs/distribution.md)：仅发布引擎及必要示例/测试，不包含个人 Key 或产品签名材料。
 
@@ -78,6 +79,7 @@ engine.destroy();
 | 入口 | 用途 |
 | --- | --- |
 | `@canvas-app/engine` | CanvasEngine、文档类型、节点扩展、场景工具 |
+| `@canvas-app/engine/web` | 默认入口的显式 Web 别名，功能相同 |
 | `@canvas-app/engine/core` | 无 DOM / PixiJS / React 的文档、布局、序列化和几何操作 |
 | `@canvas-app/engine/react` | NodePanelPortal，仅 React 使用方加载 |
 | `@canvas-app/engine/style.css` | 引擎、编辑器和浮层基础样式 |

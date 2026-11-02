@@ -4,7 +4,11 @@ permissions:
   contents: read
 jobs:
   engine:
-    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -17,4 +21,27 @@ jobs:
       - run: npm test
       - run: npx playwright install --with-deps chromium
       - run: npm run test:e2e
-      - run: npm pack --dry-run
+      - run: npm run check:package
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: browser-failure-${{ matrix.os }}
+          path: test-results/
+          retention-days: 7
+  browser-engines:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install chromium firefox webkit
+      - run: npm run test:cross-browser
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: cross-browser-failure
+          path: test-results/
+          retention-days: 7

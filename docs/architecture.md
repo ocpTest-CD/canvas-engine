@@ -4,10 +4,10 @@
 
 | 模块 | 入口 | 责任 | 禁止承担 |
 | --- | --- | --- | --- |
-| core | types.ts | Node、Edge、Camera、MediaMetadata、Change | DOM、网络、模型 |
+| core | types.ts / bridge.ts | Node、Edge、Camera、MediaMetadata、Change、JSON 场景桥接 | DOM、网络、模型 |
 | document | model.ts | 文档事务、撤销/重做、稳定节点标识 | 绘制、控件 |
 | serialization | scene.ts | version 1 校验、可选字段兼容 | 读取磁盘、Key |
-| scene | geometry.ts | 世界/屏幕坐标、RBush、连线命中 | React state |
+| scene | geometry.ts / edges.ts | 世界/屏幕坐标、双指相机、节点及连线 RBush | React state |
 | interaction | host.ts / interaction.ts | 输入状态机、5px 点击/拖动阈值、键盘 | 依赖完整 CanvasEngine |
 | layout | sizing.ts | 原始媒体比例和文本高度计算 | DOM 测量、模型参数 |
 | rendering | renderer.ts | Pixi 绘制、内容表面、LOD、连线 | 改写文档、业务执行 |
@@ -30,4 +30,6 @@ core 不依赖其他模块；serialization/layout 只依赖 core；document 依�
 
 ## 已知限制
 
-文档事务仍需对候选快照整体校验；绘制仍扫描连线和场景顺序。0.2 已避免 Hover 命中每次反向扫描全场景，但没有宣称所有大项目路径均为增量复杂度。超过数千节点需依据 benchmark 和实际媒体负载进一步测量。
+0.3 普通事务仅克隆和校验变更对象，关联边通过邻接表定位。文档通知区分 geometry/order/edges；空间索引增量更新、层级仅随结构变化重建。渲染查询视口节点并按缓存层级排序，连线查询独立 RBush；跨视口但两端不可见的边仍能绘制。
+
+结构增删/层级历史仍保存全量顺序；加载、导出与元数据测量后的素材关联节点查找仍可能遍历全场景。密集重叠会令空间索引退化。详细复杂度和实测见性能文档，不能宣称所有操作仅随可见节点增长。

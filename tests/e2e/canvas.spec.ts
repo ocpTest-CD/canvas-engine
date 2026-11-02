@@ -144,7 +144,7 @@ test("portable project with image survives import and page reload", async ({
     .locator('input[type=file][accept="application/json,.json"]')
     .setInputFiles(path!);
   await expect(page.getByRole("status")).toContainText("项目已打开");
-  await page.waitForTimeout(1200);
+  await expect(page.getByRole("status")).toContainText("已保存");
   await page.reload();
   await expect(
     page.getByRole("button", { name: "文字", exact: true }),
@@ -186,7 +186,7 @@ test("audio/video assets load, play, and persist through project export", async 
   });
   await expect(page.locator(".engine-overlay audio")).toBeVisible();
   await page.getByRole("button", { name: "完成", exact: true }).click();
-  await page.waitForTimeout(1200);
+  await expect(page.getByRole("status")).toContainText("已保存");
   await page.reload();
   await expect(
     page.getByRole("button", { name: "文字", exact: true }),

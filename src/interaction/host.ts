@@ -1,4 +1,4 @@
-import type { Camera, Node, Point, Change } from "../core/types";
+import type { Camera, Node, Point, Change, Edge } from "../core/types";
 import type { Document } from "../document/model";
 import type { SpatialIndex } from "../scene/geometry";
 import type { NodeDefinition } from "../nodes/definition";
@@ -17,6 +17,7 @@ export interface InteractionHost {
   options: { canConnect?: (a: Node, b: Node) => boolean };
   overlays: { close(save?: boolean): void };
   hitNode(p: Point): Node | undefined;
+  queryEdges(x: number, y: number, width: number, height: number): Edge[];
   hoverNode(id?: string): void;
   focusNodeControls(): void;
   activateContent(id: string, point: Point): boolean;

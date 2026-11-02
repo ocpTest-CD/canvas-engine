@@ -1,11 +1,18 @@
 import type { Node } from "../core/types";
+export interface NodeEditor {
+  element: HTMLElement;
+  dispose?: () => void;
+}
 export interface NodeDefinition {
   ports?: { input?: boolean; output?: boolean };
   onActivate?: (node: Node) => boolean;
   label: string;
   color: number;
   summary?: (node: Node) => string;
-  editor?: (node: Node, commit: (text: string) => void) => HTMLElement;
+  editor?: (
+    node: Node,
+    commit: (text: string) => void,
+  ) => HTMLElement | NodeEditor;
 }
 
 export interface NodeAction {

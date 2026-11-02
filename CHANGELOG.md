@@ -1,10 +1,49 @@
 # Changelog
 
-当前包版本：**0.2.4**。场景协议：**version 1**。核对日期：2026-11-02。
+当前包版本：**0.3.0**。场景协议：**version 1**。核对日期：2026-11-02。
 
 目前没有独立公开仓库的 Git tag、npm release 或正式发行记录。以下根据当前源码、包清单和工作区开发验收记录整理；早期引擎与 App 使用同步版本号，不代表每个版本都有独立引擎 API 变化。没有证据的逐文件变更不作推断。独立仓库从此次提取建立版本历史，早期记录不伪造成独立 Git tag。
 
-## Unreleased — 独立引擎仓库与交付文档
+## 0.3.0 — 2026-11-02（源码开发版本，未发布 npm）
+
+### Performance / architecture
+
+- 普通事务改为变更级克隆和校验；增加邻接索引，避免每次复制全部 Map 和验证全场景。
+- 几何、层级、连线通知分离；状态变更不再重建所有层级，节点空间索引按几何变化更新。
+- 新增连线 RBush；绘制和命中查询视口候选，保留端点不可见的穿越连线和拖动预览。
+- 可见节点按缓存层级排序，移除每帧全量节点过滤；缓存 bytes 增量记账，仅超预算排序淘汰。
+- 新增可追溯的 quality benchmark，记录源码/脚本 hash、后端、分位数、混合媒体、空闲帧及门槛。
+
+### API / interaction
+
+- 新增 `/web` 入口别名、`createSceneBridge`、DocumentChange、DocumentOptions、强类型 EngineEvents 和 visibleEdges 指标。
+- 桥接提供会话失效、请求去重、方法白名单、请求/响应大小及重放缓存预算；不含原生 transport 或 privileged API。
+- 支持空白单指平移、双指平移缩放，进入双指时取消未提交拖动。
+- 资源解析器支持可选 AbortSignal；资源并发、缓存、超时可配置，新增 invalidateAsset 重试。
+- 节点编辑器支持 `{element, dispose}`；编辑器/资源清理及事件监听器异常不应中断清理或已提交事务。
+
+### Correctness
+
+- canConnect 与节点端口规则覆盖 loadScene、程序事务及被更新节点的关联边。
+- 修正历史恢复的节点/边顺序和可变引用暴露，增加随机事务往返与索引一致性检查。
+- 取消或超时的解析器即使不响应信号也释放调度槽；迟到资源按所有权释放。
+- 实验场按引用保存素材字节并串行提交，修复 WebKit 下保存/重开媒体的问题；测试等待实际保存完成。
+
+### Compatibility
+
+- 场景仍为 version 1；原单参数解析器和 HTMLElement editor 兼容。
+- `history=false` 的结构操作清空撤销/重做，普通非结构更新不清空。
+- 类型化事件限制未知事件名；旧场景的非法连接可能因更完整的策略校验而拒绝。
+- 无 Swift/Kotlin 原生渲染 SDK；`/web` 与根入口相同。详见 [迁移](docs/compatibility.md)。
+
+### Verification
+
+- 构建、边界检查、38 项单元测试通过；15 个浏览器场景在三引擎执行，43 次通过、2 次触摸模拟因 CDP 不可用而跳过。
+- 实际 tarball 在无 DOM Node 消费端导入 /core 并运行 bridge 成功，检查各公开入口和包清单。
+- M1 Pro/Metal 的硬件基准通过预设四项门槛；具体数据和限制见 [性能](docs/performance.md)与[验收](docs/quality-0.3.md)。
+- 新增三 OS CI 矩阵与 macOS 三浏览器作业；本节记录本机验收，远端运行结果以对应 commit 的 GitHub Actions 为准。
+
+## 0.2.4 独立仓库提取记录（历史）
 
 ### License — 2026-11-02
 

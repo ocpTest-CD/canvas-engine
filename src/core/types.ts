@@ -48,3 +48,19 @@ export const emptyScene = (): Snapshot => ({
   edges: [],
 });
 export const uid = () => crypto.randomUUID();
+
+export interface EngineMetrics {
+  frames: number;
+  drawMs: number;
+  visible: number;
+  visibleEdges: number;
+  textures: number;
+  textureBytes: number;
+}
+export interface EngineEvents {
+  change: undefined;
+  documentChange: Set<string>;
+  nodesCloned: Map<string, string>;
+  message: string;
+  metrics: EngineMetrics;
+}

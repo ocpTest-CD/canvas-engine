@@ -1,4 +1,4 @@
-# 平台支持与接入前置条件（0.2.4）
+# 平台支持与接入前置条件（0.3.0）
 
 核对日期：2026-11-02。本引擎当前提供纯 JavaScript 数据核心和 DOM + PixiJS Web 渲染实现。跨端目标不等于所有平台已经交付 SDK；本页把可行接入路线与实际验收分开。
 
@@ -6,8 +6,8 @@
 
 | 目标 | 接入入口 | 前置条件 | 当前证据 / 状态 |
 | --- | --- | --- | --- |
-| Chromium 桌面浏览器 | 包根入口 + CSS | ESM、DOM、WebGL、Pointer Events、ResizeObserver 等 | 已有 Chromium 141/145 的历史功能测试，非所有版本认证 |
-| Safari / Firefox 桌面 | 同上 | 逐项探测 Web API、GPU、编码能力 | 接入路线可行，当前未完成独立回归，未声明最低版本 |
+| Chromium 桌面浏览器 | 包根入口 + CSS | ESM、DOM、WebGL、Pointer Events、ResizeObserver 等 | macOS Chromium 141 自动回归通过；Chrome 156/Metal 性能实测，非所有版本认证 |
+| Safari / Firefox 桌面 | 同上 | 逐项探测 Web API、GPU、编码能力 | macOS Playwright Firefox/WebKit 回归通过；WebKit 测试不是已安装 Safari/WKWebView 真机认证 |
 | React Web | 根入口 + `/react` | React/react-dom 19、客户端生命周期 | 有可运行示例和自动交互回归 |
 | Vue / Svelte Web | 根入口 + CSS | mounted 后创建，卸载时清理 | DOM 接口可接入；没有专用适配包或框架回归 |
 | Next.js / Nuxt SSR | 服务端 `/core`，客户端根入口 | 服务端不导入 Web UI；客户端动态挂载 | 集成方式说明，未完成这些框架的专项验收 |
@@ -91,7 +91,7 @@ export function checkCanvasHost() {
 
 前端加载后先创建引擎，再通知宿主 ready；场景 load 成功后再回执。场景存储和资源访问由宿主桥接；WebView 消失/重建时处理旧任务失效和资源释放。WKWebView 页面接入并不等于纯 SwiftUI 渲染引擎。
 
-必须补测：iPhone/iPad 真实触摸、软键盘遮挡、中文候选栏、横竖屏、安全区域、前后台切换、内存压力、视频首帧和播放手势。当前仅有单指 Pointer Events 路径，没有完整双指平移/缩放、手写笔压感或移动端专用菜单。最低 iOS 版本未验收，不在文档中凭空指定。
+必须补测：iPhone/iPad 真实触摸、软键盘遮挡、中文候选栏、横竖屏、安全区域、前后台切换、内存压力、视频首帧和播放手势。0.3 已实现双指平移/缩放与空白处单指平移，并通过 Chromium 触摸模拟；手写笔压感和移动端专用菜单未实现，模拟结果不替代真机。最低 iOS 版本未验收，不在文档中凭空指定。
 
 ## Android WebView
 
@@ -99,20 +99,11 @@ export function checkCanvasHost() {
 
 接入顺序仍是 ready → loadScene → 修改 → exportScene → 宿主持久化。销毁 Activity/View 时清理 WebView 和引擎；仅从布局移除不等于释放所有资源。当前未完成最低 API level、厂商 WebView、低内存设备或媒体编码矩阵验收。
 
-## 原生桥接消息建议（宿主协议，不是内置 API）
+## 原生桥接接口
 
-建议消息具有 `protocolVersion、requestId、sessionId、method、payload`；响应对应 requestId，并区分成功数据和错误。sessionId 用来拒绝上一个页面/项目的延迟结果。
+0.3 内置传输无关的 `createSceneBridge`：`version/requestId/sessionId/method/payload` 请求、对应成功/错误回执、旧会话拒绝、大小限制和有界重放去重。支持 loadScene/exportScene/applyChanges，完整示例见 [桥接指南](bridge.md)。
 
-| 建议消息 | 页面端映射 | 关键条件 |
-| --- | --- | --- |
-| `ready` | create 完成后通知 | 宿主不能只依据页面加载事件判断引擎已创建 |
-| `loadScene` | `engine.loadScene(payload)` | 校验 scene version、大小、资源映射，成功后回复 |
-| `exportScene` | `engine.exportScene()` | 已提交数据；宿主需要先处理未提交编辑草稿 |
-| `applyChanges` | `engine.applyChanges(payload)` | 白名单方法，验证 payload，避免绕过宿主业务校验 |
-| `documentChanged` | 订阅 documentChange | 合并高频通知，不逐帧传全量素材 |
-| `dispose` | `engine.destroy()` | 失效旧请求，取消宿主任务，释放映射 |
-
-这些名称是集成建议，0.2.4 不自带 transport、请求队列、超时机制或 Swift/Kotlin 类型定义。实际跨边界数据应是可序列化值；DOM、Map/Set 和函数需由宿主转换，不能原样作为通用 JSON 协议。
+宿主仍需实现可信 transport、ready 握手、响应超时、资源读取及生命周期通知；没有 Swift/Kotlin 类型包。原生回调先 JSON 解析，再交给 handle；不要把 DOM、函数或 Map/Set 跨桥传输。卸载时同时 bridge.dispose() 和 engine.destroy()。
 
 ## 无界面核心与纯原生实现
 
@@ -123,3 +114,5 @@ Node.js 可导入 `/core` 校验场景、编辑数据、计算坐标和媒体尺
 ## 平台发布验收清单
 
 每个平台报告必须记录 OS、宿主/WebView、GPU 后端、DPR、输入设备和媒体编码；验证创建/卸载、场景往返、无效数据、撤销、输入法、焦点、资源失效和前后台切换。性能按[性能文档](performance.md)单独验收。未完成者保留“接入路线/待验证”标签，不能因一台 macOS 通过就宣称全平台支持。
+
+0.3 新增 Windows/Linux/macOS 构建及 Chromium CI 矩阵、macOS 三浏览器回归定义；本地改动阶段尚未在远端执行，不能将配置文件当作各系统通过证据。

@@ -1,6 +1,6 @@
 # 独立引擎交付边界
 
-仓库：https://github.com/ocpTest-CD/canvas-engine。包版本 0.2.4，场景 version 1。源码已从 Canvas App 工作区提取，拥有独立构建配置、锁文件、示例、测试和 CI，不依赖父工作区。
+仓库：https://github.com/ocpTest-CD/canvas-engine。包版本 0.3.0，场景 version 1。源码已从 Canvas App 工作区提取，拥有独立构建配置、锁文件、示例、测试和 CI，不依赖父工作区。
 
 ## 公开范围
 
@@ -10,7 +10,7 @@
 - 可复测 benchmark 脚本及明确标注环境的历史原始记录。
 - API、平台、架构、兼容、性能、贡献指南和 CHANGELOG。
 
-实验场的 IndexedDB/便携 JSON 辅助代码复制到 playground/assets.ts，只作为宿主示例，不属于引擎核心。根目录 package.json、锁文件、Vite/TypeScript/Playwright 配置独立维护。画布引擎运行代码保持此次提取前的 0.2.4 实现。
+实验场的 IndexedDB/便携 JSON 辅助代码复制到 playground/assets.ts，只作为宿主示例，不属于引擎核心。根目录 package.json、锁文件、Vite/TypeScript/Playwright 配置独立维护。0.3.0 已升级增量文档、连线索引、资源生命周期、触摸和桥接接口，详见 CHANGELOG。
 
 ## 排除范围
 
@@ -26,6 +26,6 @@
 
 参见 [接入指南](integration.md)、[API](api.md)、[平台矩阵](platforms.md)和[性能说明](performance.md)。支持状态与原代码保持一致，没有因上传而新增 Tauri、移动或纯原生 SDK。
 
-Canvas App 下游改为安装此独立包属于后续集成任务，当前未更改用户桌面 App。提取后的接口通过独立构建、逻辑/交互测试和包清单验证；验证记录见 [独立仓库验证](standalone-validation.md)。
+Canvas App 下游改为安装此独立包属于后续集成任务，当前未更改用户桌面 App。提取后的接口通过独立构建、逻辑/交互测试和包清单验证；提取时验证见 [独立仓库验证](standalone-validation.md)，当前升级验证见 [0.3.0 质量评审](quality-0.3.md)。
 
 npm 包 files 清单只包含 dist、README、CONTRIBUTING、CHANGELOG、docs、LICENSE。tests/examples/benchmarks 源码保留在 GitHub 仓库；包中文档指向这些目录的相对链接请在仓库中阅读。

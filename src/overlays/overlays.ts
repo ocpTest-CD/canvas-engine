@@ -6,13 +6,16 @@ export class Overlays {
   private element?: HTMLDivElement;
   private disposeAsset?: () => void;
   private token = 0;
+  private request?: AbortController;
   private commit?: () => void;
+  private disposeEditor?: () => void;
   id?: string;
   constructor(
     private host: HTMLElement,
     private resolve: AssetResolver,
     private update: (id: string, text: string) => void,
     private closed: (id: string) => void,
+    private failed: (error: unknown) => void = () => {},
   ) {}
   open(n: Node, def?: NodeDefinition) {
     this.close();
@@ -30,8 +33,11 @@ export class Overlays {
     panel.append(close);
     if (n.type === "text" || def?.editor) {
       const commit = (text: string) => this.update(n.id, text);
-      const editor =
+      const result =
         def?.editor?.(n, commit) ?? document.createElement("textarea");
+      const editor = result instanceof HTMLElement ? result : result.element;
+      this.disposeEditor =
+        result instanceof HTMLElement ? undefined : result.dispose;
       if (editor instanceof HTMLTextAreaElement) {
         editor.value = n.text ?? "";
         editor.setAttribute("aria-label", "节点文本");
@@ -45,7 +51,8 @@ export class Overlays {
       const message = document.createElement("p");
       message.textContent = "正在读取素材…";
       panel.append(message);
-      void this.resolve(n.assetId)
+      this.request = new AbortController();
+      void this.resolve(n.assetId, { signal: this.request.signal })
         .then((asset) => {
           if (token !== this.token) {
             asset.release?.();
@@ -105,9 +112,18 @@ export class Overlays {
   }
   close(save = true) {
     this.token++;
+    this.request?.abort();
+    this.request = undefined;
     const commit = this.commit;
     this.commit = undefined;
-    if (save) commit?.();
+    const attempt = (fn?: () => void) => {
+      try {
+        fn?.();
+      } catch (error) {
+        this.failed(error);
+      }
+    };
+    if (save) attempt(commit);
     this.element?.querySelectorAll("video,audio").forEach((el) => {
       const m = el as HTMLMediaElement;
       m.pause();
@@ -116,13 +132,17 @@ export class Overlays {
     });
     if (this.element?.contains(document.activeElement))
       this.host.focus({ preventScroll: true });
+    const disposeEditor = this.disposeEditor;
+    this.disposeEditor = undefined;
+    attempt(disposeEditor);
     this.element?.remove();
     this.element = undefined;
-    this.disposeAsset?.();
+    const disposeAsset = this.disposeAsset;
     this.disposeAsset = undefined;
+    attempt(disposeAsset);
     const was = this.id;
     this.id = undefined;
-    if (was && save) this.closed(was);
+    if (was && save) attempt(() => this.closed(was));
   }
   destroy() {
     this.close(false);

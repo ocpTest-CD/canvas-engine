@@ -1,4 +1,4 @@
-# API 参考（0.2.4）
+# API 参考（0.3.0）
 
 本页以当前源码为准，不包含规划接口。导出的完整 TypeScript 声明随构建产物提供。0.x 尚无跨小版本稳定保证；不要导入内部 src 路径。
 
@@ -7,11 +7,12 @@
 | 入口 | 导出 / 用途 | 运行前置条件 |
 | --- | --- | --- |
 | `@canvas-app/engine` | CanvasEngine、Options、Document、节点和资源契约、几何与布局工具 | DOM/WebGL；使用时导入 CSS |
-| `@canvas-app/engine/core` | Document、validate、Point/Camera/Node/Edge/Snapshot/Change、MediaMetadata、uid/emptyScene、SpatialIndex、toScreen/toWorld/zoomAt/segmentDistance、fitMedia/fitText | ES2022 目标的现代 JS、structuredClone；uid 需要 crypto.randomUUID；空间索引需要 rbush |
+| `@canvas-app/engine/web` | 与默认入口完全相同 | DOM/WebGL |
+| `@canvas-app/engine/core` | Document、validate、Point/Camera/Node/Edge/Snapshot/Change、MediaMetadata、uid/emptyScene、SpatialIndex/EdgeIndex、toScreen/toWorld/zoomAt/pinchCamera/segmentDistance、fitMedia/fitText、createSceneBridge | ES2022 目标的现代 JS、structuredClone；uid 需要 crypto.randomUUID；空间索引需要 rbush |
 | `@canvas-app/engine/react` | NodePanelPortal | DOM + 已创建的引擎 + React/react-dom 19 |
 | `@canvas-app/engine/style.css` | Web 画布、编辑层和浮层样式 | 宿主 CSS 加载支持 |
 
-`/core` 不加载 DOM、PixiJS 或 React，但包级 peerDependencies 仍声明 pixi.js/rbush；运行依赖和包安装声明不是一回事。当前没有 `/web`、Vue SDK、原生 SDK 或可替换 renderer 的公开工厂。
+`/core` 不加载 DOM、PixiJS 或 React，但包级 peerDependencies 仍声明 pixi.js/rbush；运行依赖和包安装声明不是一回事。`/web` 是默认入口别名，不是第二套 renderer。当前没有 Vue SDK、原生 SDK 或可替换 renderer 的公开工厂。
 
 ## 创建与宿主回调
 
@@ -19,11 +20,12 @@
 import type { Node } from '@canvas-app/engine';
 
 interface Options {
-  resolveAsset?: (id: string) => Promise<{
+  resolveAsset?: (id: string, context?: { signal: AbortSignal }) => Promise<{
     url: string;
     mime: string;
     release?: () => void;
   }>;
+  resources?: { budgetBytes?: number; maxEntries?: number; concurrency?: number; timeoutMs?: number };
   nodeActions?: (node: Node) => Array<{
     id: string;
     label: string;
@@ -39,7 +41,7 @@ interface Options {
 - `resolveAsset`：缺省时仍可用文本节点，加载媒体会报告无解析器。资源契约见[接入指南](integration.md)。
 - `nodeActions`：可在渲染时调用，应保持纯计算且轻量；不要在其中发网络请求。`run` 抛错/reject 由工具栏转为 message。
 - `nodePanel`：面板切换/卸载调用返回的清理函数；同一节点内容变化不会保证重新挂载。
-- `canConnect`：仅用户交互创建连线时调用，不自动约束 `loadScene/applyChanges`。当前 Edge 没有命名端口和强类型端口协议。
+- `canConnect`：同时约束用户连线、`loadScene/applyChanges` 及事务内被修改节点的已有连线；节点定义的端口开关也会检查。规则应是纯函数，动态更改规则不会自动审查已存在数据，undo/redo 恢复已验证历史，不重新执行外部策略。当前 Edge 没有命名端口和强类型端口协议。
 
 ## 核心数据
 
@@ -77,6 +79,8 @@ interface Options {
 | `edit(id)` | 打开内容编辑器/播放器；自定义 onActivate 返回 true 可接管 |
 | `showNodePanel(id?, reveal = false)` | 显示指定节点面板，无 ID 关闭；reveal 可请求视口避让 |
 | `mountNodePanel(id, element)` | 挂载 DOM 面板并返回卸载函数；一次仅一个，不与另一面板方案叠加使用 |
+| `invalidateAsset(id)` | 释放该素材缓存并在下一次可见渲染重试；不会删除宿主素材 |
+| `queryEdges(x,y,width,height)` | 世界坐标矩形内的候选边；包围盒可能多选，调用方做精确命中 |
 | `adaptNode(id)` | 显式切换自动尺寸并适配，可撤销；媒体未加载时请求资源 |
 | `focusNode(id) / fitToContent()` | 居中指定节点 / 总览；不会改节点坐标 |
 | `zoom(factor)` | 围绕视口中心按倍率缩放，限制在 0.02～4 |
@@ -104,7 +108,7 @@ doc.redo();
 const scene = doc.snapshot();
 ```
 
-`Document.load/apply/snapshot/undo/redo/updateStatus/reorder` 可独立使用。`snapshot()` 不含相机；`revision` 是变化计数，`canUndo/canRedo` 是历史状态。`onChange(ids)` 是单一回调槽，独立 Document 可使用；不要覆盖已绑定 CanvasEngine 的 document.onChange，否则破坏索引和渲染通知。
+`Document.load/apply/snapshot/undo/redo/updateStatus/reorder` 可独立使用。`snapshot()` 不含相机；`revision` 是变化计数，`canUndo/canRedo` 是历史状态。`onChange(ids, detail)` 是单一回调槽，独立 Document 可使用；不要覆盖已绑定 CanvasEngine 的 document.onChange，否则破坏索引和渲染通知。
 
 ## 节点扩展
 
@@ -116,16 +120,17 @@ interface NodeDefinition {
   color: number;
   ports?: { input?: boolean; output?: boolean };
   summary?: (node: Node) => string;
-  editor?: (node: Node, commit: (text: string) => void) => HTMLElement;
+  editor?: (node: Node, commit: (text: string) => void) =>
+    HTMLElement | { element: HTMLElement; dispose?: () => void };
   onActivate?: (node: Node) => boolean;
 }
 ```
 
-内置类型为 text/image/video/audio。自定义 editor 属于 DOM 内容编辑层，并非任意自定义 GPU 节点正文渲染器。当前没有 editor dispose 回调；需要外部订阅、计时器或复杂框架组件时，优先使用带清理契约的 nodePanel 或由宿主管理 onActivate 界面。框架、原生控件及渲染后端的进一步替换属于后续接口设计。
+内置类型为 text/image/video/audio。自定义 editor 属于 DOM 内容编辑层，并非任意自定义 GPU 节点正文渲染器。返回 `{ element, dispose }` 时关闭/替换/销毁编辑器会调用 dispose。兼容仅返回 HTMLElement；外部订阅、计时器和框架组件由 dispose 清理。清理异常转为 message，不应阻断引擎卸载。框架、原生控件及渲染后端的进一步替换属于后续接口设计。
 
 ## 事件
 
-`engine.on(name, handler)` 返回取消订阅函数。当前签名不是强类型事件映射，payload 类型是 unknown；宿主需收窄类型。监听器应轻量、不抛错，不在 change 回调中无条件再次 notify。
+`engine.on(name, handler)` 返回取消订阅函数。签名使用 `EngineEvents` 强类型映射，payload 自动推断。监听器异常会转为 message 并隔离，message 监听器的异常不会递归派发。监听器仍应轻量，不在 change 回调中无条件再次 notify。
 
 | 名称 | payload | 语义 |
 | --- | --- | --- |
@@ -133,8 +138,26 @@ interface NodeDefinition {
 | `documentChange` | `Set<string>` | 受影响节点 ID；纯连线事务可为空，仍是有效变化通知 |
 | `nodesCloned` | `Map<string,string>` | 原节点到新节点 ID；宿主可复制关联业务配置 |
 | `message` | string | 错误或状态消息；不保证包含所有宿主错误 |
-| `metrics` | `{frames, drawMs, visible, textures, textureBytes}` | 每次引擎绘制后的诊断值，具体口径见性能文档 |
+| `metrics` | `{frames, drawMs, visible, visibleEdges, textures, textureBytes}` | 每次引擎绘制后的诊断值，具体口径见性能文档 |
 
 ## React Portal
 
 `NodePanelPortal({engine, nodeId, children})` 将 children 挂载到引擎定位的 DOM 容器，保留 React Context；父组件监听 change 并用 engine.panelId 找到当前节点。不要在实例创建前渲染，不在 SSR 渲染；不要同时用 nodePanel 回调和 Portal 争用同一个面板。
+
+## 0.3 增量通知和资源配置
+
+`new Document({ canConnect: (edge, from, to) => boolean })` 为纯核心宿主提供连接约束。`incidentEdges(id)` 返回独立只读集合，不能据此修改内部索引。
+
+`DocumentChange` 包含 `edges: Set<string>`、`geometry: Set<string>`、`orderChanged: boolean`、可选 `reset: boolean`。几何不变的文本/状态更新不重建空间索引和层级缓存。已有单参数 onChange 回调仍兼容；独立 Document 的回调由宿主负责异常处理。
+
+`resources` 默认 `budgetBytes=96*1024*1024`、`maxEntries=128`、`concurrency=3`、`timeoutMs=30000`；均须正数，条目数和并发数须整数。预算为缩略图软预算，不能作为进程内存限制。超时从任务出队开始，包含 resolve 和解码；等待队列时间不计入。预览播放器另有生命周期，不受缩略图并发和超时配置控制。
+
+解析器的 context 为可选参数，旧单参数函数可直接使用。关闭/失效后取消信号会触发，宿主 fetch 应传入 `context?.signal`。忽略取消的请求仍可能继续耗费宿主带宽，但不会永久占用引擎调度槽；迟到 URL 会释放。
+
+## JSON 场景桥接
+
+`createSceneBridge(host, sessionId, { maxBytes?, replayEntries? })` 从根入口和 `/core` 导出；host 提供 `loadScene`、`exportScene`、`applyChanges`。接口及接线示例见 [桥接指南](bridge.md)。`handle` 同步返回 BridgeResponse；`dispose` 仅使桥接失效，不销毁宿主引擎。
+
+## 兼容注意
+
+`history=false` 的节点增删或连线变更会清空撤销/重做，避免历史恢复悬空连线；普通非结构更新和 updateStatus 不清空历史。需要保留可撤销结构操作时使用默认 history=true。场景继续为 version 1。
