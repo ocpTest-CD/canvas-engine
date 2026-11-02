@@ -45,7 +45,7 @@
       "optional": true
     }
   },
-  "license": "UNLICENSED",
+  "license": "MIT",
   "description": "Framework-optional canvas engine with a headless core, WebGL rendering and node-local editing.",
   "repository": {
     "type": "git",

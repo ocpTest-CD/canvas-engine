@@ -13,7 +13,7 @@ npm run build:engine
 npm pack
 ```
 
-构建基线为 Node.js 22；锁文件固定开发依赖。生成的包名预计为 `canvas-app-engine-0.2.4.tgz`，以 `npm pack` 实际输出为准。仓库地址为 https://github.com/ocpTest-CD/canvas-engine；当前仍为 UNLICENSED，公开源码不等于授予开源再分发许可。
+构建基线为 Node.js 22；锁文件固定开发依赖。生成的包名预计为 `canvas-app-engine-0.2.4.tgz`，以 `npm pack` 实际输出为准。仓库地址为 https://github.com/ocpTest-CD/canvas-engine；代码采用 [MIT 许可证](../LICENSE)，第三方依赖保留各自许可证。
 
 在有 ESM/CSS 支持的接入方工程中，安装本地包：
 
@@ -23,7 +23,7 @@ npm install /absolute/path/to/canvas-app-engine-0.2.4.tgz pixi.js@8.22.0 rbush@4
 npm install react@19 react-dom@19
 ```
 
-这说明本地技术接入方式，不表示当前 UNLICENSED 包已获得公开再分发授权。引擎不需要 Electron、Apple 签名证书、API Key 或模型服务才能运行。当前没有 UMD/CDN 全局变量发行包，推荐使用 Vite 等支持 ESM 和 CSS 的构建器。
+本项目的使用、修改和再分发遵循 [MIT 许可证](../LICENSE)。引擎不需要 Electron、Apple 签名证书、API Key 或模型服务才能运行。当前没有 UMD/CDN 全局变量发行包，推荐使用 Vite 等支持 ESM 和 CSS 的构建器。
 
 ## 2. 最小 Web 接入
 

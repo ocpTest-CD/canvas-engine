@@ -18,7 +18,7 @@
 
 ## 版本与许可
 
-仓库公开源码，但 LICENSE 仍为 UNLICENSED，未擅自选择开源许可。package.json 保持 private，避免误发布 npm。公开 GitHub 仓库不等于获得任意使用、修改和再分发授权；项目所有者确定许可后再更新。现阶段不创建虚构的早期 tag，也不把源码上传当作正式稳定 release。
+项目所有者已于 2026-11-02 确认采用 [MIT 许可证](../LICENSE)，源码按 MIT 开源。package.json 保持 private，仅避免误发布 npm；第三方依赖仍适用各自许可证。现阶段不创建虚构的早期 tag，也不把源码上传当作正式稳定 release。
 
 引擎源码和 npm 构建不需要 Apple 签名。使用者若发行桌面 App，自行配置其发布证书，不需要本项目作者的个人 Key。
 

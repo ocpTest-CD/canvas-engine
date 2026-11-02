@@ -1,6 +1,6 @@
 # Canvas Engine 文档
 
-核对日期：2026-11-02。当前包 `@canvas-app/engine` **0.2.4**；场景协议 **version 1**；状态为未发布开发版本，`private: true`、`UNLICENSED`。版本来自 `package.json`，不是 npm 或 GitHub Release 记录。
+核对日期：2026-11-02。当前包 `@canvas-app/engine` **0.2.4**；场景协议 **version 1**；状态为 MIT 开源开发版本，尚未发布 npm；`private: true` 防止意外 npm 发布。版本来自 `package.json`，不是 npm 或 GitHub Release 记录。
 
 | 阅读目标 | 文档 |
 | --- | --- |

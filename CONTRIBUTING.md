@@ -1,6 +1,6 @@
 # 贡献指南
 
-先读 README.md、docs/README.md、docs/architecture.md 和待修改模块的 README。保持引擎不依赖 App、Electron、模型服务或个人环境。当前许可为 UNLICENSED；仓库公开尚不等于授予开源使用许可。
+先读 README.md、docs/README.md、docs/architecture.md 和待修改模块的 README。保持引擎不依赖 App、Electron、模型服务或个人环境。本项目采用 [MIT 许可证](LICENSE)；第三方依赖保留各自许可。
 
 在本仓库根目录运行：
 
