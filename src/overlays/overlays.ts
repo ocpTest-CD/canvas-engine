@@ -1,7 +1,7 @@
-import type { Node, Camera } from "../core/types";
-import type { NodeDefinition } from "../nodes/definition";
-import type { AssetResolver } from "../resources/resources";
-import { toScreen } from "../scene/geometry";
+import type { Node, Camera } from "../core/types.js";
+import type { NodeDefinition } from "../nodes/definition.js";
+import type { AssetResolver } from "../resources/resources.js";
+import { toScreen } from "../scene/geometry.js";
 export class Overlays {
   private element?: HTMLDivElement;
   private disposeAsset?: () => void;
@@ -52,7 +52,10 @@ export class Overlays {
       message.textContent = "正在读取素材…";
       panel.append(message);
       this.request = new AbortController();
-      void this.resolve(n.assetId, { signal: this.request.signal })
+      void this.resolve(n.assetId, {
+        signal: this.request.signal,
+        purpose: "original",
+      })
         .then((asset) => {
           if (token !== this.token) {
             asset.release?.();

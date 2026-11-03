@@ -1,4 +1,4 @@
-# API 参考（0.3.0）
+# API 参考（0.6.3）
 
 本页以当前源码为准，不包含规划接口。导出的完整 TypeScript 声明随构建产物提供。0.x 尚无跨小版本稳定保证；不要导入内部 src 路径。
 
@@ -69,8 +69,8 @@ interface Options {
 | `registerNodeType(type, definition)` | 注册/覆盖展示定义并请求渲染；不是注册工作流执行器 |
 | `loadScene(raw)` | 先验证再切换，关闭旧浮层、清空历史和缓存、恢复相机；同步抛错 |
 | `exportScene()` | 返回含相机的独立快照；不包含素材字节、未提交草稿、业务配置 |
-| `applyChanges(changes, history = true)` | 原子文档事务，并补充自动尺寸；失败发 message 且抛错 |
-| `updateStatus(id, status)` | 更新节点状态，不进入历史；status 仍可出现在导出场景中 |
+| `applyChanges(changes, boolean | ApplyOptions = true)` | 原子文档事务；本地 put 补充自动尺寸，remote/patch 精确重放；失败发 message 且抛错 |
+| `updateStatus(id, status)` | 委托 runtime 状态，不进入历史或场景；旧场景已保存的 status 兼容保留 |
 | `add(type, point?, assetId?)` | 创建 auto 节点，返回 ID，并选择/打开其面板 |
 | `removeSelected()` | 删除当前所选节点/边及关联边 |
 | `copy() / paste() / duplicate()` | 引擎实例内节点剪贴板；不等于系统跨应用剪贴板 |
@@ -135,6 +135,8 @@ interface NodeDefinition {
 | 名称 | payload | 语义 |
 | --- | --- | --- |
 | `change` | 无 | 文档或临时 UI 状态变更；不是仅内容变化 |
+| `transaction` | `CommittedTransaction` | 已提交的操作、ID、来源和本地 revision |
+| `runtimeChange` | `{id,state?}` | 独立运行状态，非文档变更 |
 | `documentChange` | `Set<string>` | 受影响节点 ID；纯连线事务可为空，仍是有效变化通知 |
 | `nodesCloned` | `Map<string,string>` | 原节点到新节点 ID；宿主可复制关联业务配置 |
 | `message` | string | 错误或状态消息；不保证包含所有宿主错误 |
@@ -161,3 +163,23 @@ interface NodeDefinition {
 ## 兼容注意
 
 `history=false` 的节点增删或连线变更会清空撤销/重做，避免历史恢复悬空连线；普通非结构更新和 updateStatus 不清空历史。需要保留可撤销结构操作时使用默认 history=true。场景继续为 version 1。
+
+## 0.4 接入增量
+
+事务、运行状态、资源与只读模式以及 updateStatus 迁移见 [后端接入](backend-integration.md)。旧版示例中的 Node.status 只表示历史持久字段，最新运行状态读取 document.runtime。
+
+## 0.5 选择与范围高亮
+
+`getSelection()`、`setSelection(ids)`、`selectionChange`、`setExecutionPreview(value?)`、`getExecutionPreview()`、`executionPreviewChange` 的完整契约见 [范围接入](execution-selection.md)。
+
+## 0.6 节点执行呈现
+
+`Options.nodePrimaryAction(node): NodeAction | undefined` 为可执行节点提供常驻操作。`setRuntimeState` 接受可选 active、phase、attemptId、sequence、startedAt，progress 为 0..1，未知时省略。参见 [执行控件与宿主接入](execution-controls.md)。状态与服务隔离，不改变 scene version 1。
+
+### 节点名称原位编辑（0.6.1）
+
+内置标题编辑与 `applyChanges([{kind:"patch",id,patch:{title}}])` 使用相同事务路径，不改节点 ID 和连线。已有 `documentChange` / transaction 事件和撤销行为继续适用。无新增模型、服务端或文件系统 API；交互和平台条件见 [接入指南](integration.md#061-原位重命名)。
+
+## 0.6.2 执行锁
+
+活动 runtime 默认锁定本地节点编辑；宿主配置控件检查 `document.isNodeLocked(id)`，生成结果以 `origin: "system"` 写入。完整行为与接入迁移见 [节点执行控件](execution-controls.md#062-活动节点锁定契约)。

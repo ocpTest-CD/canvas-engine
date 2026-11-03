@@ -2,7 +2,7 @@
 
 本地多模态画布引擎，TypeScript + PixiJS；节点内容直接展示，悬停操作位于上方，参数面板锚定下方。模型调用、密钥、文件存储和工作流执行由宿主提供。
 
-当前包版本 **0.3.0**，场景协议 **version 1**。这是可构建、打包与集成的开发版本，已提取为独立源码仓库，尚未发布 npm。本项目采用 [MIT 许可证](LICENSE) 开源；`private: true` 仅用于防止意外发布 npm，不限制 MIT 授予的使用权限。第三方依赖保留各自许可证。
+当前包版本 **0.6.3**，场景协议 **version 1**。这是可构建、打包与集成的开发版本，已提取为独立源码仓库，尚未发布 npm。本项目采用 [MIT 许可证](LICENSE) 开源；`private: true` 仅用于防止意外发布 npm，不限制 MIT 授予的使用权限。第三方依赖保留各自许可证。
 
 ## 接入与版本文档
 
@@ -94,3 +94,11 @@ engine.destroy();
 - [兼容及迁移](docs/compatibility.md)
 - [贡献与验证](CONTRIBUTING.md)
 - [本次架构决策](docs/decisions/0002-node-surfaces.md)
+
+0.4 后端/SDK 接入能力与升级行为见 [接入说明](docs/backend-integration.md)。
+
+[0.4 接入验收记录](docs/quality-0.4.md)。
+
+0.5 选区快照、执行预览和跨端桥接见 [执行接入](docs/execution-selection.md)。
+
+[0.6.3 交付验收与迁移范围](docs/quality-0.6.3.md)。

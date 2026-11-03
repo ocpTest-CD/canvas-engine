@@ -1,7 +1,19 @@
-import type { Node, Edge, Change, Snapshot } from "../core/types";
-import { validate, validateNode, validateEdge } from "../serialization/scene";
-export * from "../core/types";
-export { validate } from "../serialization/scene";
+import type {
+  Node,
+  Edge,
+  Change,
+  Snapshot,
+  ApplyOptions,
+  CommittedTransaction,
+  RuntimeState,
+} from "../core/types.js";
+import {
+  validate,
+  validateNode,
+  validateEdge,
+} from "../serialization/scene.js";
+export * from "../core/types.js";
+export { validate } from "../serialization/scene.js";
 interface Patch {
   nodes: Map<string, Node | undefined>;
   edges: Map<string, Edge | undefined>;
@@ -13,6 +25,7 @@ interface Transaction {
   after: Patch;
 }
 export interface DocumentOptions {
+  canEdit?: () => boolean;
   canConnect?: (edge: Edge, from: Node, to: Node) => boolean;
 }
 export interface DocumentChange {
@@ -37,6 +50,40 @@ export class Document {
   private adjacency = new Map<string, Set<string>>();
   private past: Transaction[] = [];
   private future: Transaction[] = [];
+  readonly runtime = new Map<string, RuntimeState>();
+  isNodeLocked(id: string) {
+    return this.runtime.get(id)?.active === true;
+  }
+  private patchTouchesLocked(p: Patch) {
+    if ([...p.nodes.keys()].some((id) => this.isNodeLocked(id))) return true;
+    if (p.order) {
+      const nextIds = new Set(p.order);
+      const current = [...this.nodes.keys()].filter((id) => nextIds.has(id));
+      const next = p.order.filter((id) => this.nodes.has(id));
+      if (
+        current.some((id, index) => this.isNodeLocked(id) && next[index] !== id)
+      )
+        return true;
+    }
+    for (const [id, next] of p.edges) {
+      for (const edge of [this.edges.get(id), next])
+        if (
+          edge &&
+          (this.isNodeLocked(edge.from) || this.isNodeLocked(edge.to))
+        )
+          return true;
+    }
+    return false;
+  }
+  onTransaction: (transaction: CommittedTransaction) => void = () => {};
+  onRuntimeChange: (id: string, state?: RuntimeState) => void = () => {};
+  private assertEditable(origin = "local") {
+    if (
+      (origin === "local" || origin === "history") &&
+      this.options.canEdit?.() === false
+    )
+      throw Error("画布为只读");
+  }
   onChange: (ids: Set<string>, detail: DocumentChange) => void = () => {};
   incidentEdges(id: string): ReadonlySet<string> {
     return new Set(this.adjacency.get(id));
@@ -72,6 +119,7 @@ export class Document {
     for (const edge of this.edges.values()) this.link(edge);
     this.past = [];
     this.future = [];
+    this.runtime.clear();
     this.revision++;
     this.onChange(new Set(this.nodes.keys()), {
       edges: new Set(this.edges.keys()),
@@ -88,7 +136,12 @@ export class Document {
       edges: [...this.edges.values()],
     });
   }
-  apply(changes: Change[], history = true) {
+  apply(changes: Change[], settings: boolean | ApplyOptions = true) {
+    const options: ApplyOptions =
+      typeof settings === "boolean" ? { history: settings } : settings;
+    const origin = options.origin ?? "local";
+    const history = options.history ?? origin === "local";
+    this.assertEditable(origin);
     if (!changes.length) return;
     const ns = new Map<string, Node | undefined>(),
       es = new Map<string, Edge | undefined>();
@@ -102,7 +155,33 @@ export class Document {
     const getEdgeOrder = () => (edgeOrder ??= new Set(this.edges.keys()));
     for (const c of changes) {
       if (!c || typeof c !== "object") throw Error("无效变更");
-      if (c.kind === "put") {
+      if (c.kind === "patch") {
+        const current = getNode(c.id);
+        if (!current) throw Error("节点不存在");
+        if (
+          c.set &&
+          ("id" in c.set ||
+            Object.keys(c.set).some(
+              (k) => k === "__proto__" || k === "constructor",
+            ))
+        )
+          throw Error("禁止修改节点 ID");
+        const next = { ...current, ...structuredClone(c.set ?? {}) };
+        for (const key of c.unset ?? []) {
+          if (String(key) === "id") throw Error("禁止删除节点 ID");
+          delete (next as unknown as Record<string, unknown>)[key];
+        }
+        ns.set(c.id, next);
+      } else if (c.kind === "reorder") {
+        const expected = getOrder();
+        if (
+          c.ids.length !== expected.size ||
+          new Set(c.ids).size !== expected.size ||
+          c.ids.some((id) => !expected.has(id))
+        )
+          throw Error("无效层级顺序");
+        order = new Set(c.ids);
+      } else if (c.kind === "put") {
         if (!c.node || typeof c.node.id !== "string") throw Error("无效节点");
         if (!getNode(c.node.id)) getOrder().add(c.node.id);
         ns.set(c.node.id, structuredClone(c.node));
@@ -172,29 +251,46 @@ export class Document {
       ...(order ? { order: [...order] } : {}),
       ...(edgeOrder ? { edgeOrder: [...edgeOrder] } : {}),
     };
+    if (
+      (origin === "local" || origin === "history") &&
+      this.patchTouchesLocked(after)
+    )
+      throw Error("节点执行中，请先取消执行再修改");
     if (history) {
       this.past.push({ before, after });
       if (this.past.length > 100) this.past.shift();
       this.future = [];
+    } else if (origin === "remote" || origin === "system") {
+      // Conservative conflict policy: discard overlapping undo entries, retain unrelated edits.
+      const overlaps = (t: Transaction) =>
+        [...ns.keys()].some((id) => t.before.nodes.has(id)) ||
+        [...es.keys()].some((id) => t.before.edges.has(id));
+      this.past = this.past.filter((t) => !overlaps(t));
+      this.future = this.future.filter((t) => !overlaps(t));
+      if (order || edgeOrder)
+        for (const t of [...this.past, ...this.future]) {
+          delete t.before.order;
+          delete t.after.order;
+          delete t.before.edgeOrder;
+          delete t.after.edgeOrder;
+        }
     } else if (order || es.size) {
       this.past = [];
       this.future = [];
     }
-    this.commit(after, false);
+    this.commit(after, false, options);
   }
   updateStatus(id: string, status: string) {
-    if (typeof status !== "string") throw Error("无效状态");
-    const n = this.nodes.get(id);
-    if (!n) return;
-    this.nodes.set(id, { ...n, status });
-    this.revision++;
-    this.onChange(new Set([id]), {
-      edges: new Set(),
-      geometry: new Set(),
-      orderChanged: false,
-    });
+    this.setRuntimeState(id, { ...this.runtime.get(id), status });
+  }
+  setRuntimeState(id: string, state?: RuntimeState) {
+    if (!this.nodes.has(id)) return;
+    if (state) this.runtime.set(id, structuredClone(state));
+    else this.runtime.delete(id);
+    this.onRuntimeChange(id, state ? structuredClone(state) : undefined);
   }
   reorder(ids: string[]) {
+    this.assertEditable();
     if (
       ids.length !== this.nodes.size ||
       new Set(ids).size !== ids.length ||
@@ -213,12 +309,51 @@ export class Document {
       edges: new Map(),
       order: [...ids],
     };
+    if (this.patchTouchesLocked(after))
+      throw Error("节点执行中，请先取消执行再修改");
     this.past.push({ before, after });
     if (this.past.length > 100) this.past.shift();
     this.future = [];
     this.commit(after, true);
   }
-  private commit(p: Patch, preserveStatus: boolean) {
+  private commit(
+    p: Patch,
+    preserveStatus: boolean,
+    options: ApplyOptions = {},
+  ) {
+    const operations: Change[] = [];
+    for (const [id, next] of p.nodes) {
+      const old = this.nodes.get(id);
+      if (!next) operations.push({ kind: "remove", id });
+      else if (!old)
+        operations.push({ kind: "put", node: structuredClone(next) });
+      else {
+        const set: Record<string, unknown> = {},
+          unset: string[] = [];
+        for (const key of new Set([
+          ...Object.keys(old),
+          ...Object.keys(next),
+        ])) {
+          if (key === "id") continue;
+          const k = key as keyof Node;
+          if (JSON.stringify(old[k]) === JSON.stringify(next[k])) continue;
+          if (next[k] === undefined) unset.push(key);
+          else set[key] = structuredClone(next[k]);
+        }
+        operations.push({
+          kind: "patch",
+          id,
+          set,
+          unset: unset as Array<keyof Omit<Node, "id">>,
+        });
+      }
+    }
+    for (const [id, edge] of p.edges)
+      operations.push(
+        edge
+          ? { kind: "connect", edge: structuredClone(edge) }
+          : { kind: "disconnect", id },
+      );
     const geometry = new Set<string>();
     for (const [id, n] of p.nodes) {
       const old = this.nodes.get(id);
@@ -230,7 +365,10 @@ export class Document {
             ? { ...n, status: old.status }
             : n,
         );
-      else this.nodes.delete(id);
+      else {
+        this.nodes.delete(id);
+        this.runtime.delete(id);
+      }
     }
     for (const [id, e] of p.edges) {
       const old = this.edges.get(id);
@@ -255,31 +393,53 @@ export class Document {
         ].map((id) => [id, this.nodes.get(id)!]),
       );
     }
+    if (p.order)
+      operations.push({ kind: "reorder", ids: [...this.nodes.keys()] });
     this.revision++;
     this.onChange(new Set(p.nodes.keys()), {
       edges: new Set(p.edges.keys()),
       geometry,
       orderChanged: !!p.order,
     });
+    try {
+      this.onTransaction({
+        transactionId: options.transactionId ?? crypto.randomUUID(),
+        origin: options.origin ?? "local",
+        revision: this.revision,
+        operations,
+      });
+    } catch {
+      /* committed state must not be rolled back by observers */
+    }
   }
   undo() {
+    this.assertEditable("history");
+    if (!this.canUndo) return;
     const t = this.past.pop();
     if (t) {
-      this.commit(t.before, true);
+      this.commit(t.before, true, { origin: "history" });
       this.future.push(t);
     }
   }
   redo() {
+    this.assertEditable("history");
+    if (!this.canRedo) return;
     const t = this.future.pop();
     if (t) {
-      this.commit(t.after, true);
+      this.commit(t.after, true, { origin: "history" });
       this.past.push(t);
     }
   }
   get canUndo() {
-    return this.past.length > 0;
+    return (
+      this.past.length > 0 &&
+      !this.patchTouchesLocked(this.past[this.past.length - 1].before)
+    );
   }
   get canRedo() {
-    return this.future.length > 0;
+    return (
+      this.future.length > 0 &&
+      !this.patchTouchesLocked(this.future[this.future.length - 1].after)
+    );
   }
 }

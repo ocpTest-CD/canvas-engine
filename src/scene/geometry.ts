@@ -1,5 +1,5 @@
 import RBush from "rbush";
-import type { Camera, Node, Point } from "../core/types";
+import type { Camera, Node, Point } from "../core/types.js";
 export interface Box {
   minX: number;
   minY: number;

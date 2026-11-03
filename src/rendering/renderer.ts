@@ -1,8 +1,8 @@
 import { Application, Container, Graphics, Text, Sprite } from "pixi.js";
-import type { Camera, Node, Edge, Point } from "../core/types";
-import { toScreen } from "../scene/geometry";
-import { Resources } from "../resources/resources";
-import type { NodeDefinition } from "../nodes/definition";
+import type { Camera, Node, Edge, Point, ExecutionPreview } from "../core/types.js";
+import { toScreen } from "../scene/geometry.js";
+import { Resources } from "../resources/resources.js";
+import type { NodeDefinition } from "../nodes/definition.js";
 export interface RenderState {
   camera: Camera;
   nodes: Node[];
@@ -10,6 +10,7 @@ export interface RenderState {
   edges: Iterable<Edge>;
   selected: Set<string>;
   selectedEdge?: string;
+  execution?: ExecutionPreview;
   preview: Map<string, Node>;
   box?: { a: Point; b: Point };
   connection?: { from: string; to: Point };
@@ -82,7 +83,7 @@ export class Renderer {
         .lineTo(q.x, q.y)
         .stroke({
           color:
-            e.id === s.selectedEdge ? 0xd6882c : s.dark ? 0x77786f : 0xb9b6ab,
+            e.id === s.selectedEdge ? (s.dark ? 0xffcc66 : 0xd6882c) : s.dark ? 0x72727c : 0xb9b6ab,
           width: e.id === s.selectedEdge ? 3 : 1.6,
         });
     }
@@ -106,7 +107,7 @@ export class Renderer {
           const p = toScreen(n, s.camera);
           this.overview
             .rect(p.x, p.y, n.width * zoom, n.height * zoom)
-            .stroke({ color: 0xd68a32, width: 2 });
+            .stroke({ color: (s.dark ? 0xffcc66 : 0xd68a32), width: 2 });
         }
     }
     for (const [order, n] of (zoom < 0.2 ? [] : s.nodes).entries()) {
@@ -146,9 +147,9 @@ export class Renderer {
         const color = def?.color ?? 0xbbb7b1;
         const g = new Graphics()
           .roundRect(0, 0, n.width, n.height, 14)
-          .fill(s.dark ? 0x30322f : 0xfffdf8)
+          .fill(s.dark ? 0x222225 : 0xfffdf8)
           .stroke({
-            color: selected ? 0xd68a32 : s.dark ? 0x52544d : 0xdad6ca,
+            color: selected ? (s.dark ? 0xffcc66 : 0xd68a32) : s.dark ? 0x39393f : 0xdad6ca,
             width: selected ? 2.5 : 1,
           });
         card.root.addChild(g);
@@ -169,7 +170,7 @@ export class Renderer {
           if (asset.metadata?.mime.startsWith("video/")) {
             const play = new Graphics()
               .circle(n.width / 2, n.height / 2, 23)
-              .fill({ color: 0x20231f, alpha: 0.65 });
+              .fill({ color: 0x141416, alpha: 0.65 });
             play
               .moveTo(n.width / 2 - 5, n.height / 2 - 9)
               .lineTo(n.width / 2 + 10, n.height / 2)
@@ -204,7 +205,7 @@ export class Renderer {
               fontFamily: "system-ui, sans-serif",
               fontSize: 14,
               lineHeight: 23,
-              fill: s.dark ? 0xe4e5dc : 0x41473c,
+              fill: s.dark ? 0xf4f4f5 : 0x41473c,
               wordWrap: true,
               wordWrapWidth: Math.max(1, n.width - 32),
               breakWords: true,
@@ -224,7 +225,7 @@ export class Renderer {
               fontFamily: "system-ui, sans-serif",
               fontSize: 12,
               fontWeight: "500",
-              fill: s.dark ? 0xd0d3c6 : 0x656c5d,
+              fill: s.dark ? 0xb3b3bc : 0x656c5d,
             },
           });
           title.position.set(0, -24);
@@ -239,7 +240,7 @@ export class Renderer {
           if (selected)
             ports
               .roundRect(n.width - 10, n.height - 10, 7, 7, 2)
-              .fill(0xd68a32);
+              .fill((s.dark ? 0xffcc66 : 0xd68a32));
           card.root.addChild(ports);
           if (n.status && n.status !== "已完成") {
             const badge = new Text({
@@ -247,13 +248,13 @@ export class Renderer {
               style: {
                 fontFamily: "system-ui",
                 fontSize: 12,
-                fill: s.dark ? 0xffcd85 : 0x865215,
+                fill: s.dark ? 0xffcc66 : 0x865215,
               },
             });
             const bg = new Graphics()
-              .roundRect(8, 8, Math.min(n.width - 16, badge.width + 20), 28, 8)
-              .fill(s.dark ? 0x30322f : 0xfff8e9);
-            badge.position.set(18, 14);
+              .roundRect(0, n.height + 8, Math.min(n.width, badge.width + 20), 26, 8)
+              .fill(s.dark ? 0x222225 : 0xfff8e9);
+            badge.position.set(10, n.height + 14);
             card.root.addChild(bg, badge);
           }
         }
@@ -261,7 +262,7 @@ export class Renderer {
           card.root.addChild(
             new Graphics()
               .roundRect(0, 0, n.width, n.height, 14)
-              .stroke({ color: 0xd68a32, width: 2 }),
+              .stroke({ color: (s.dark ? 0xffcc66 : 0xd68a32), width: 2 }),
           );
       }
       const point = toScreen(n, s.camera);
@@ -271,6 +272,16 @@ export class Renderer {
       card.root.zIndex = order;
     }
     this.guides.clear();
+    // Screen-space outlines remain visible at every LOD without changing node contents.
+    const visibleNodes = new Map(s.nodes.map(n => [n.id, n]));
+    for (const [kind, color] of [["execute",0x58bca4],["blocked",0xe7a94f],["cancel",0xef8585]] as const) {
+      for (const id of s.execution?.[kind] ?? []) {
+        const n=visibleNodes.get(id);if(!n)continue;
+        const p=toScreen(n,s.camera);
+        this.guides.roundRect(p.x-5,p.y-5,n.width*zoom+10,n.height*zoom+10,12).stroke({color,width:2,alpha:0.9});
+      }
+    }
+
     if (s.box) {
       const a = toScreen(s.box.a, s.camera),
         b = toScreen(s.box.b, s.camera);
@@ -281,8 +292,8 @@ export class Renderer {
           Math.abs(a.x - b.x),
           Math.abs(a.y - b.y),
         )
-        .fill({ color: 0xd69b48, alpha: 0.1 })
-        .stroke({ color: 0xd69b48, width: 1 });
+        .fill({ color: (s.dark ? 0xffcc66 : 0xd69b48), alpha: 0.1 })
+        .stroke({ color: (s.dark ? 0xffcc66 : 0xd69b48), width: 1 });
     }
     if (s.connection) {
       const n = node(s.connection.from);
@@ -295,7 +306,7 @@ export class Renderer {
         this.guides
           .moveTo(a.x, a.y)
           .lineTo(b.x, b.y)
-          .stroke({ color: 0xd69b48, width: 2 });
+          .stroke({ color: (s.dark ? 0xffcc66 : 0xd69b48), width: 2 });
       }
     }
     this.app.render();

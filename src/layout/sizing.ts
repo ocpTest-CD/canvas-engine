@@ -1,4 +1,4 @@
-import type { MediaMetadata } from "../core/types";
+import type { MediaMetadata } from "../core/types.js";
 /** Canvas units, independent of zoom or thumbnail resolution. */
 export function fitMedia(media: Pick<MediaMetadata, "width" | "height">) {
   const { width, height } = media;

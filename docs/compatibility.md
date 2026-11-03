@@ -19,3 +19,17 @@ App 便携项目 envelope、assets 和 appState 继续由宿主管理。引擎�
 - 资源默认 30 秒超时；慢速宿主可显式配置，并接入 AbortSignal。原解析器一参数签名兼容。
 - 自定义 editor 可返回 `{ element, dispose }`；原 HTMLElement 返回值兼容。
 - `/web` 为根入口别名；bridge 是 JSON 消息处理器，不是 Swift/Kotlin 或可替换原生 renderer。
+
+## 0.4 接入增量
+
+事务、运行状态、资源与只读模式以及 updateStatus 迁移见 [后端接入](backend-integration.md)。旧版示例中的 Node.status 只表示历史持久字段，最新运行状态读取 document.runtime。
+
+
+## 从 0.3 升级到 0.6.3
+
+- 场景格式仍为 version 1，已有节点/连线可继续加载。
+- `updateStatus` 更新独立 runtime，不写入 `node.status`；读取运行状态请改用 `engine.document.runtime.get(id)` 或 `runtimeChange`。
+- 使用 transaction 事件与 origin 区分本地、远端和系统变更，避免同步回声。具体见 [后端接入](backend-integration.md)。
+- 运行时设 active=true 将锁住本地编辑及相关撤销。宿主生成结果用 system 来源写回，终态明确 active=false。宿主自有参数表单也需遵守锁；详见 [执行控件](execution-controls.md)。
+- 选区/执行预览、原位标题与运行控件为引擎能力；任务调度、模型 API、取消、鉴权、扣费和审核由宿主实现。
+- `/core` 仍可在无 DOM 环境使用；Web、React 和 WebView 的平台边界不变。

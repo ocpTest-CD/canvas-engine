@@ -1,4 +1,4 @@
-import type { Snapshot, Node, Edge } from "../core/types";
+import type { Snapshot, Node, Edge } from "../core/types.js";
 const finite = (v: unknown) =>
   typeof v === "number" && Number.isFinite(v) && Math.abs(v) <= 1e9;
 export function validate(raw: unknown): Snapshot {

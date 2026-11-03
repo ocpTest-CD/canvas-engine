@@ -202,3 +202,39 @@
 .node-toolbar-more > div {
   z-index: 2;
 }
+
+/* Execution controls stay in screen space. CSS animates only visible active nodes;
+   no document mutation or continuous WebGL render loop is needed. */
+.engine-execution-controls { position:absolute; inset:0; pointer-events:none; overflow:hidden; z-index:7; }
+.engine-node-execution { position:absolute; top:0; left:0; border-radius:14px; }
+.engine-node-execution.is-running { outline:1px solid var(--engine-accent, #dba953); outline-offset:2px; }
+.engine-node-run { position:absolute; right:0; top:-29px; width:25px; height:25px; padding:0; border:1px solid var(--engine-border, #d3d0c6); border-radius:8px; background:var(--engine-panel, #fffdf6); color:var(--engine-text, #35392f); cursor:pointer; pointer-events:auto; font-size:11px; display:grid; place-items:center; }
+.engine-node-run:hover { background:#eac16c; color:#252118; }
+.engine-node-run:focus-visible { outline:2px solid #cf9b3f; outline-offset:2px; }
+.engine-node-run:disabled { opacity:.5; cursor:default; }
+.engine-node-progress { position:absolute; inset:0; width:100%; height:100%; overflow:hidden; border-radius:inherit; background:#fffaf0ed; pointer-events:auto; cursor:wait; display:grid; place-items:center; isolation:isolate; }
+.engine-node-progress-fill { position:absolute; inset:0 auto 0 0; height:100%; background:linear-gradient(110deg,#edbc5833,#edbc5866); transition:width .2s ease; }
+.engine-node-progress-label { position:relative; max-width:calc(100% - 24px); overflow:hidden; white-space:nowrap; text-overflow:ellipsis; font:600 12px/1.6 system-ui; color:#514022; border-radius:8px; padding:7px 11px; background:#fffaf0e6; box-shadow:0 2px 12px #4335180a; }
+.engine-node-progress.is-indeterminate .engine-node-progress-fill { background:linear-gradient(90deg,transparent,#eab85a66,transparent); animation:engine-progress 1.7s ease-in-out infinite alternate; }
+.engine-node-progress:not(.is-indeterminate):not(.is-waiting)::before {content:"";position:absolute;inset:0;pointer-events:none;background:linear-gradient(110deg,transparent 20%,#eab85a24 50%,transparent 80%);background-size:200% 100%;animation:engine-progress-sheen 2s ease-in-out infinite alternate;}
+@keyframes engine-progress-sheen {from {background-position:100% 0;} to {background-position:0 0;}}
+.engine-node-execution.is-compact .engine-node-progress-label {font-size:9px;padding:2px 4px;max-width:calc(100% - 4px);}
+.engine-node-execution.is-compact .engine-node-run {width:20px;height:20px;top:-23px;}
+.engine-host[data-theme="dark"] .engine-node-progress,.engine-host.dark .engine-node-progress {background:#222225ed;}
+.engine-host[data-theme="dark"] .engine-node-progress-label,.engine-host.dark .engine-node-progress-label {background:#2a2a2ee6;color:#ffcc66;}
+.engine-node-execution [hidden] { display:none; }
+.engine-host.dark .engine-node-run { background:#2a2a2e; border-color:#44444b; color:#f4f4f5; }
+@keyframes engine-progress { from { transform:translateX(0); } to { transform:translateX(230%); } }
+@media (prefers-reduced-motion:reduce) { .engine-node-progress-fill,.engine-node-progress::before { animation:none!important; transition:none; } }
+.reduced-motion .engine-node-progress-fill,.reduced-motion .engine-node-progress::before { animation:none!important; transition:none; }
+.engine-execution-controls.is-paused .engine-node-progress-fill,.engine-execution-controls.is-paused .engine-node-progress::before {animation-play-state:paused;}
+.engine-host[data-theme="dark"] .engine-node-run {background:#2a2a2e;border-color:#44444b;color:#f4f4f5;}
+
+.engine-node-progress.is-waiting .engine-node-progress-fill {animation:none;opacity:0;}
+
+/* Hit areas retain Pixi's title typography; only the active name mounts an input. */
+.engine-node-titles { position:absolute; inset:0; pointer-events:none; z-index:4; }
+.engine-node-titles .engine-title-target { position:absolute; pointer-events:auto; margin:0; padding:0; min-height:0; border:0; border-radius:4px; background:transparent; box-shadow:none; cursor:text; }
+.engine-node-titles .engine-title-target:hover { background:#eab85a15; }
+.engine-node-titles .engine-title-target:focus-visible { outline:2px solid #eab85a; outline-offset:2px; }
+.engine-node-titles .engine-title-input { position:absolute; pointer-events:auto; box-sizing:border-box; padding:2px 5px; border:1px solid var(--accent,#d68a32); border-radius:5px; outline:none; color:var(--ink,#30362d); background:var(--panel,#fffcf5); font-family:system-ui,sans-serif; font-weight:500; z-index:1; }

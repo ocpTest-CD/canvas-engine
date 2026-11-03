@@ -1,0 +1,78 @@
+{
+  "initial": {
+    "version": 1,
+    "nodes": [
+      {
+        "id": "a",
+        "type": "text",
+        "title": "A",
+        "x": 0,
+        "y": 0,
+        "width": 100,
+        "height": 100
+      },
+      {
+        "id": "b",
+        "type": "image",
+        "title": "B",
+        "x": 300,
+        "y": 0,
+        "width": 100,
+        "height": 100
+      }
+    ],
+    "edges": [
+      {
+        "id": "ab",
+        "from": "a",
+        "to": "b"
+      }
+    ]
+  },
+  "operations": [
+    {
+      "kind": "patch",
+      "id": "a",
+      "set": {
+        "text": "shared contract",
+        "x": 42
+      }
+    },
+    {
+      "kind": "reorder",
+      "ids": [
+        "b",
+        "a"
+      ]
+    },
+    {
+      "kind": "disconnect",
+      "id": "ab"
+    }
+  ],
+  "expected": {
+    "version": 1,
+    "nodes": [
+      {
+        "id": "b",
+        "type": "image",
+        "title": "B",
+        "x": 300,
+        "y": 0,
+        "width": 100,
+        "height": 100
+      },
+      {
+        "id": "a",
+        "type": "text",
+        "title": "A",
+        "x": 42,
+        "y": 0,
+        "width": 100,
+        "height": 100,
+        "text": "shared contract"
+      }
+    ],
+    "edges": []
+  }
+}

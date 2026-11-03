@@ -1,1 +1,1 @@
-export { NodePanelPortal } from "./adapters/react";
+export { NodePanelPortal } from "./adapters/react.js";

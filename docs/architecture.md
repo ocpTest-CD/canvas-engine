@@ -12,7 +12,7 @@
 | layout | sizing.ts | 原始媒体比例和文本高度计算 | DOM 测量、模型参数 |
 | rendering | renderer.ts | Pixi 绘制、内容表面、LOD、连线 | 改写文档、业务执行 |
 | nodes | definition.ts | 节点定义、内置类型、操作契约 | 保存 API Key |
-| overlays | floating.ts / overlays.ts | 屏幕坐标浮层、焦点、编辑/播放生命周期 | 参数的业务含义 |
+| overlays | floating.ts / overlays.ts / titles.ts / execution.ts | 屏幕坐标浮层、焦点、编辑/播放生命周期 | 参数的业务含义 |
 | resources | resources.ts / media.ts | 并发解码、封面、缩略图、缓存释放 | 假设素材来自磁盘 |
 | adapters | react.tsx | 通过 Portal 挂载宿主表单 | 拥有第二份场景数据 |
 

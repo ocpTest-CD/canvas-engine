@@ -1,6 +1,6 @@
-import type { Camera, Node } from "../core/types";
-import type { NodeAction } from "../nodes/definition";
-import { toScreen } from "../scene/geometry";
+import type { Camera, Node } from "../core/types.js";
+import type { NodeAction } from "../nodes/definition.js";
+import { toScreen } from "../scene/geometry.js";
 /** Screen-space chrome. Never contributes to document bounds or spatial queries. */
 export class Floating {
   readonly layer = document.createElement("div");
@@ -13,6 +13,7 @@ export class Floating {
     observer: ResizeObserver;
   };
   private reveal = false;
+  private readonly bottomInset: number;
   private abort = new AbortController();
   constructor(
     private host: HTMLElement,
@@ -20,6 +21,8 @@ export class Floating {
     private dismiss: () => void,
     private report: (error: unknown) => void,
   ) {
+    const inset = Number.parseFloat(getComputedStyle(host).getPropertyValue("--canvas-overlay-bottom-inset"));
+    this.bottomInset = Number.isFinite(inset) ? Math.max(16, inset) : 16;
     this.layer.className = "engine-floating";
     this.toolbar.className = "node-toolbar";
     this.toolbar.setAttribute("role", "toolbar");
@@ -152,7 +155,10 @@ export class Floating {
         if (this.reveal && element.offsetHeight) {
           this.reveal = false;
           const overflow =
-            bottom + Math.min(520, this.host.clientHeight * 0.64) + 16 - this.host.clientHeight;
+            bottom +
+            Math.min(520, this.host.clientHeight * 0.64) +
+            this.bottomInset -
+            this.host.clientHeight;
           if (overflow > 0) {
             camera.y += overflow / camera.zoom;
             this.changed();
@@ -161,7 +167,7 @@ export class Floating {
           }
         }
         // After initial reveal, growth uses the remaining space without moving the canvas.
-        element.style.maxHeight = `${Math.max(0, Math.min(520, this.host.clientHeight * 0.64, this.host.clientHeight - bottom - 16))}px`;
+        element.style.maxHeight = `${Math.max(0, Math.min(520, this.host.clientHeight * 0.64, this.host.clientHeight - bottom - this.bottomInset))}px`;
         element.style.left = `${Math.max(12, Math.min(this.host.clientWidth - width - 12, p.x + (panelNode.width * camera.zoom) / 2 - width / 2))}px`;
         element.style.top = `${bottom}px`;
         if (

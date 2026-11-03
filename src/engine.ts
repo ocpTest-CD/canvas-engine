@@ -1,4 +1,6 @@
 import "./style.css";
+import { selectionSnapshot, executionPreview } from "./core/selection.js";
+import type { SelectionSnapshot, ExecutionPreview } from "./core/types.js";
 import {
   Document,
   validate,
@@ -6,33 +8,40 @@ import {
   type Node,
   type Camera,
   type Change,
+  type ApplyOptions,
+  type RuntimeState,
   type Snapshot,
   type Point,
   type EngineEvents,
   type EngineMetrics,
-} from "./document/model";
-import { EdgeIndex } from "./scene/edges";
-import { SpatialIndex, toScreen, zoomAt } from "./scene/geometry";
-import { Renderer } from "./rendering/renderer";
+} from "./document/model.js";
+import { EdgeIndex } from "./scene/edges.js";
+import { SpatialIndex, toScreen, zoomAt } from "./scene/geometry.js";
+import { Renderer } from "./rendering/renderer.js";
 import {
   builtinNodes,
   type NodeDefinition,
   type NodeAction,
-} from "./nodes/definition";
+} from "./nodes/definition.js";
 import {
   Resources,
   validateResourceOptions,
   type AssetResolver,
   type ResourceOptions,
-} from "./resources/resources";
-import { Overlays } from "./overlays/overlays";
-import { Interaction } from "./interaction/interaction";
-import { NodeCommands } from "./document/commands";
-import { Floating } from "./overlays/floating";
-import { fitMedia, fitText } from "./layout/sizing";
+} from "./resources/resources.js";
+import { Overlays } from "./overlays/overlays.js";
+import { Interaction } from "./interaction/interaction.js";
+import { NodeCommands } from "./document/commands.js";
+import { NodeTitles } from "./overlays/titles.js";
+import { ExecutionControls } from "./overlays/execution.js";
+import { Floating } from "./overlays/floating.js";
+import { fitMedia, fitText } from "./layout/sizing.js";
 export interface Options {
+  readOnly?: boolean;
   resolveAsset?: AssetResolver;
   resources?: ResourceOptions;
+  /** Persistent viewport-only primary action supplied by the host. */
+  nodePrimaryAction?: (node: Node) => NodeAction | undefined;
   nodeActions?: (node: Node) => NodeAction[];
   nodePanel?: (node: Node, container: HTMLElement) => (() => void) | void;
   canConnect?: (a: Node, b: Node) => boolean;
@@ -44,6 +53,21 @@ export class CanvasEngine {
   camera: Camera = { x: -100, y: -100, zoom: 1 };
   selected = new Set<string>();
   selectedEdge?: string;
+  private selectionSignature = "";
+  private executionOverlay: ExecutionPreview = executionPreview(new Map());
+  getSelection(): SelectionSnapshot { return selectionSnapshot(this.document.nodes, this.selected); }
+  setSelection(ids: Iterable<string>) {
+    this.selected = new Set(selectionSnapshot(this.document.nodes, ids).nodeIds);
+    this.selectedEdge = undefined;
+    this.notify();
+  }
+  setExecutionPreview(value?: Partial<ExecutionPreview>) {
+    this.executionOverlay = executionPreview(this.document.nodes, value);
+    this.requestRender();
+    this.emit("executionPreviewChange", this.executionOverlay);
+  }
+  getExecutionPreview(): ExecutionPreview { return this.executionOverlay; }
+
   preview = new Map<string, Node>();
   box?: { a: Point; b: Point };
   connection?: { from: string; to: Point };
@@ -56,6 +80,9 @@ export class CanvasEngine {
   private ranks = new Map<string, number>();
   private panelCleanup?: () => void;
   readonly floating: Floating;
+  private executionControls: ExecutionControls;
+  private interactionLocks = new Set<string>();
+  private titles: NodeTitles;
   resources: Resources;
   renderer: Renderer;
   overlays: Overlays;
@@ -81,8 +108,22 @@ export class CanvasEngine {
     public options: Options,
   ) {
     this.document = new Document({
+      canEdit: () => !this.options.readOnly,
       canConnect: (_edge, from, to) => this.connectionAllowed(from, to),
     });
+    this.document.onTransaction = (tx) => this.emit("transaction", tx);
+    this.document.onRuntimeChange = (id, state) => {
+      if (state?.active && !this.interactionLocks.has(id)) {
+        this.interactionLocks.add(id);
+        this.interaction?.cancel();
+        if (this.overlays?.id === id) this.overlays.close(false);
+        if (this.panelId === id) this.showNodePanel();
+        this.titles?.lock(id);
+      }
+      if (!state?.active) this.interactionLocks.delete(id);
+      this.requestRender();
+      this.emit("runtimeChange", { id, state });
+    };
     this.commands = new NodeCommands(this, (mapping) =>
       this.emit("nodesCloned", mapping),
     );
@@ -102,6 +143,12 @@ export class CanvasEngine {
       (async () => {
         throw Error("未提供素材解析器");
       });
+    this.titles = new NodeTitles(host, (id, title, original) => {
+      const current = this.document.nodes.get(id);
+      if (!this.options.readOnly && !this.document.isNodeLocked(id) && current?.title === original)
+        this.applyChanges([{ kind: "patch", id, set: { title } }]);
+    });
+    this.executionControls = new ExecutionControls(host, error => this.message(String(error)));
     this.floating = new Floating(
       host,
       () => this.requestRender(),
@@ -121,7 +168,8 @@ export class CanvasEngine {
           if (JSON.stringify(next) !== JSON.stringify(node))
             changes.push({ kind: "put", node: next });
         }
-        this.applyChanges(changes, false);
+        if (!this.options.readOnly)
+          this.applyChanges(changes, { origin: "system", history: false });
       },
       options.resources,
     );
@@ -165,6 +213,8 @@ export class CanvasEngine {
         );
       if (this.selectedEdge && !this.document.edges.has(this.selectedEdge))
         this.selectedEdge = undefined;
+      const overlayIds=[...this.executionOverlay.execute,...this.executionOverlay.blocked,...this.executionOverlay.cancel];
+      if(overlayIds.some(id=>!this.document.nodes.has(id))) this.setExecutionPreview(this.executionOverlay);
       this.notify();
       this.emit("documentChange", ids);
     };
@@ -218,22 +268,30 @@ export class CanvasEngine {
       if (!this.connectionAllowed(lookup.get(edge.from)!, lookup.get(edge.to)!))
         throw Error("连线不符合宿主规则");
     this.overlays.close(false);
+    // Remove old screen-space targets synchronously before the next render.
+    this.titles.update([], this.camera, true);
+    this.executionControls.update([], this.camera, this.document.runtime, undefined, true);
+    this.floating.update(undefined, [], this.camera, undefined, true);
     this.showNodePanel();
     this.hoveredId = undefined;
     this.interaction?.cancel();
     const s = this.document.load(raw);
+    this.interactionLocks.clear();
     this.selected.clear();
     this.selectedEdge = undefined;
     this.resources.clear();
+    this.setExecutionPreview();
     this.camera = s.camera ?? { x: -100, y: -100, zoom: 1 };
     this.notify();
   }
   exportScene(): Snapshot {
     return { ...this.document.snapshot(), camera: { ...this.camera } };
   }
-  applyChanges(changes: Change[], history = true) {
+  applyChanges(changes: Change[], history: boolean | ApplyOptions = true) {
     try {
       const prepared = changes.map((change): Change => {
+        if (typeof history === "object" && history.origin === "remote")
+          return change;
         if (change.kind !== "put") return change;
         let node = change.node;
         const previous = this.document.nodes.get(node.id);
@@ -260,6 +318,20 @@ export class CanvasEngine {
       this.message(err instanceof Error ? err.message : String(err));
       throw err;
     }
+  }
+  setReadOnly(value: boolean) {
+    this.options.readOnly = value;
+    this.interaction?.cancel();
+    this.overlays.close(false);
+    // Remove old screen-space targets synchronously before the next render.
+    this.titles.update([], this.camera, true);
+    this.executionControls.update([], this.camera, this.document.runtime, undefined, true);
+    this.floating.update(undefined, [], this.camera, undefined, true);
+    this.showNodePanel();
+    this.notify();
+  }
+  setRuntimeState(id: string, state?: RuntimeState) {
+    this.document.setRuntimeState(id, state);
   }
   invalidateAsset(id: string) {
     this.resources.invalidate(id);
@@ -324,12 +396,21 @@ export class CanvasEngine {
     this.commands.reorder(front);
   }
   edit(id: string) {
+    if (this.document.isNodeLocked(id)) return;
+    if (this.options.readOnly) {
+      const n = this.document.nodes.get(id);
+      if (n?.assetId && n.type !== "text") {
+        this.overlays.open(n);
+        this.requestRender();
+      }
+      return;
+    }
     this.showNodePanel();
     const n = this.document.nodes.get(id);
     if (!n) return;
     if (this.definitions.get(n.type)?.onActivate?.(n)) return;
     this.selected = new Set([id]);
-    this.reorder(true);
+    if (!this.interactionLocks.size) this.reorder(true);
     this.overlays.open(n, this.definitions.get(n.type));
     this.notify();
   }
@@ -394,6 +475,8 @@ export class CanvasEngine {
     }
   }
   showNodePanel(id?: string, reveal = false) {
+    if (id && this.document.isNodeLocked(id)) return;
+    if (id && this.options.readOnly) return;
     if (id && !this.document.nodes.has(id)) return;
     if (this.panelId !== id) {
       this.panelCleanup?.();
@@ -436,6 +519,11 @@ export class CanvasEngine {
     if (node.assetId) this.resources.request(node.assetId);
   }
   private actions(node: Node): NodeAction[] {
+    if (this.document.isNodeLocked(node.id)) return [];
+    if (this.options.readOnly)
+      return node.assetId && node.type !== "text"
+        ? [{ id: "preview", label: "预览", run: () => this.edit(node.id) }]
+        : [];
     const media =
       node.media ??
       (node.assetId ? this.resources.get(node.assetId)?.metadata : undefined);
@@ -547,6 +635,12 @@ export class CanvasEngine {
     this.emit("message", text);
   }
   notify() {
+    const selection = this.getSelection();
+    const signature = JSON.stringify(selection);
+    if (signature !== this.selectionSignature) {
+      this.selectionSignature = signature;
+      this.emit("selectionChange", selection);
+    }
     this.requestRender();
     this.emit("change");
     this.live.textContent = this.selected.size
@@ -580,7 +674,12 @@ export class CanvasEngine {
     const nodes = [...ids]
       .sort((a, b) => (this.ranks.get(a) ?? 0) - (this.ranks.get(b) ?? 0))
       .map((id) => this.preview.get(id) ?? this.document.nodes.get(id))
-      .filter((node): node is Node => !!node);
+      .filter((node): node is Node => !!node)
+      .map((node) =>
+        this.document.runtime.has(node.id)
+          ? { ...node, status: this.document.runtime.get(node.id)?.active ? undefined : this.document.runtime.get(node.id)?.status }
+          : node,
+      );
     const edges = this.queryEdges(
       c.x - 20 / c.zoom,
       c.y - 20 / c.zoom,
@@ -600,6 +699,7 @@ export class CanvasEngine {
       all: this.document.nodes,
       edges,
       selected: this.selected,
+      execution: this.executionOverlay,
       selectedEdge: this.selectedEdge,
       preview: this.preview,
       box: this.box,
@@ -625,6 +725,9 @@ export class CanvasEngine {
       panelNode,
       this.gestureActive || !!this.overlays.id,
     );
+    this.host.dataset.theme = this.dark ? "dark" : "light";
+    this.titles.update(nodes.filter(n => !this.document.isNodeLocked(n.id)), c, !!this.options.readOnly || !!this.overlays.id || this.gestureActive);
+    this.executionControls.update(nodes, c, this.document.runtime, this.options.readOnly ? undefined : this.options.nodePrimaryAction, !this.host.clientWidth || !this.host.clientHeight);
     this.metrics = {
       frames: this.metrics.frames + 1,
       drawMs: performance.now() - start,
@@ -645,11 +748,15 @@ export class CanvasEngine {
     clearTimeout(this.hoverTimer);
     this.panelCleanup?.();
     this.floating.destroy();
+    this.executionControls.destroy();
+    this.titles.destroy();
     this.overlays.destroy();
     this.resources.destroy();
     this.renderer.destroy();
     this.listeners.clear();
     this.live.remove();
     this.document.onChange = () => {};
+    this.document.onTransaction = () => {};
+    this.document.onRuntimeChange = () => {};
   }
 }

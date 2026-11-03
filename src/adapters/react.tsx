@@ -1,6 +1,6 @@
 import { useLayoutEffect, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
-import type { CanvasEngine } from "../engine";
+import type { CanvasEngine } from "../engine.js";
 /** React content, engine-owned positioning. Children keep the host React context. */
 export function NodePanelPortal({
   engine,

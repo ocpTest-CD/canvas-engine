@@ -1,7 +1,7 @@
-import type { Camera, Node, Point, Change, Edge } from "../core/types";
-import type { Document } from "../document/model";
-import type { SpatialIndex } from "../scene/geometry";
-import type { NodeDefinition } from "../nodes/definition";
+import type { Camera, Node, Point, Change, Edge } from "../core/types.js";
+import type { Document } from "../document/model.js";
+import type { SpatialIndex } from "../scene/geometry.js";
+import type { NodeDefinition } from "../nodes/definition.js";
 /** Narrow interaction port; no dependency on the engine composition root. */
 export interface InteractionHost {
   host: HTMLElement;
@@ -14,7 +14,7 @@ export interface InteractionHost {
   box?: { a: Point; b: Point };
   connection?: { from: string; to: Point };
   definitions: Map<string, NodeDefinition>;
-  options: { canConnect?: (a: Node, b: Node) => boolean };
+  options: { readOnly?: boolean; canConnect?: (a: Node, b: Node) => boolean };
   overlays: { close(save?: boolean): void };
   hitNode(p: Point): Node | undefined;
   queryEdges(x: number, y: number, width: number, height: number): Edge[];

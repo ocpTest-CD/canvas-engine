@@ -1,10 +1,27 @@
-import type { Change, Snapshot } from "./types";
+import type {
+  Change,
+  Snapshot,
+  ApplyOptions,
+  SelectionSnapshot,
+  ExecutionPreview,
+} from "./types.js";
 export interface SceneBridgeHost {
+  getSelection?(): SelectionSnapshot;
+  setSelection?(ids: Iterable<string>): void;
+  setExecutionPreview?(value?: Partial<ExecutionPreview>): void;
+  getExecutionPreview?(): ExecutionPreview;
   loadScene(scene: unknown): void;
   exportScene(): Snapshot;
-  applyChanges(changes: Change[]): void;
+  applyChanges(changes: Change[], options?: boolean | ApplyOptions): void;
 }
-export type BridgeMethod = "loadScene" | "exportScene" | "applyChanges";
+export type BridgeMethod =
+  | "loadScene"
+  | "exportScene"
+  | "applyChanges"
+  | "getSelection"
+  | "setSelection"
+  | "setExecutionPreview"
+  | "getExecutionPreview";
 export interface BridgeRequest {
   version: 1;
   sessionId: string;
@@ -17,7 +34,7 @@ export interface BridgeResponse {
   sessionId: string;
   requestId: string;
   ok: boolean;
-  data?: Snapshot | null;
+  data?: Snapshot | SelectionSnapshot | ExecutionPreview | null;
   error?: {
     code:
       | "INVALID_REQUEST"
@@ -82,7 +99,15 @@ export function createSceneBridge(
         typeof raw.sessionId !== "string" ||
         !requestId ||
         raw.requestId !== requestId ||
-        !["loadScene", "exportScene", "applyChanges"].includes(raw.method ?? "")
+        ![
+          "loadScene",
+          "exportScene",
+          "applyChanges",
+          "getSelection",
+          "setSelection",
+          "setExecutionPreview",
+          "getExecutionPreview",
+        ].includes(raw.method ?? "")
       )
         return failure("INVALID_REQUEST", "Invalid bridge message");
       if (raw.sessionId !== sessionId)
@@ -105,18 +130,74 @@ export function createSceneBridge(
             );
       let response: BridgeResponse;
       try {
-        if (raw.method === "loadScene") host.loadScene(raw.payload);
+        let data: BridgeResponse["data"] = null;
+        if (raw.method === "getSelection") {
+          if (!host.getSelection) throw Error("Selection API unavailable");
+          data = host.getSelection();
+        } else if (raw.method === "getExecutionPreview") {
+          if (!host.getExecutionPreview)
+            throw Error("Execution preview API unavailable");
+          data = host.getExecutionPreview();
+        } else if (raw.method === "setSelection") {
+          if (!host.setSelection) throw Error("Selection API unavailable");
+          if (
+            !Array.isArray(raw.payload) ||
+            raw.payload.some((v) => typeof v !== "string")
+          )
+            return failure("INVALID_REQUEST", "Selection must be node IDs");
+          host.setSelection(raw.payload);
+        } else if (raw.method === "setExecutionPreview") {
+          if (!host.setExecutionPreview)
+            throw Error("Execution preview API unavailable");
+          const p = raw.payload;
+          if (
+            p !== undefined &&
+            (p === null ||
+              typeof p !== "object" ||
+              Array.isArray(p) ||
+              Object.entries(p).some(
+                ([k, v]) =>
+                  !["execute", "blocked", "cancel"].includes(k) ||
+                  !Array.isArray(v) ||
+                  v.some((id) => typeof id !== "string"),
+              ))
+          )
+            return failure("INVALID_REQUEST", "Invalid execution preview");
+          host.setExecutionPreview(p as Partial<ExecutionPreview> | undefined);
+        } else if (raw.method === "loadScene") host.loadScene(raw.payload);
         else if (raw.method === "applyChanges") {
-          if (!Array.isArray(raw.payload))
-            return failure("INVALID_REQUEST", "Changes must be an array");
-          host.applyChanges(raw.payload as Change[]);
+          const payload = raw.payload as
+            | { operations?: Change[]; options?: ApplyOptions }
+            | undefined;
+          if (Array.isArray(payload)) host.applyChanges(payload as Change[]);
+          else if (payload && Array.isArray(payload.operations)) {
+            const options = payload.options;
+            if (
+              options &&
+              (typeof options !== "object" ||
+                (options.origin !== undefined &&
+                  !["local", "remote", "system", "history"].includes(
+                    options.origin,
+                  )) ||
+                (options.history !== undefined &&
+                  typeof options.history !== "boolean") ||
+                (options.transactionId !== undefined &&
+                  typeof options.transactionId !== "string"))
+            )
+              return failure("INVALID_REQUEST", "Invalid transaction options");
+            host.applyChanges(payload.operations, options);
+          } else
+            return failure(
+              "INVALID_REQUEST",
+              "Changes must be an array or transaction envelope",
+            );
         }
         response = {
           version: 1,
           sessionId,
           requestId,
           ok: true,
-          data: raw.method === "exportScene" ? host.exportScene() : null,
+          data: raw.method === "exportScene" ? host.exportScene() : data,
         };
       } catch (error) {
         response = failure(

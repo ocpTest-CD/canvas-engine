@@ -114,3 +114,88 @@ it("bounds response sizes and the replay window", () => {
     bridge.handle({ ...request("exportScene"), requestId: "3" }).error?.code,
   ).toBe("RESPONSE_TOO_LARGE");
 });
+it("forwards remote transaction options without entering local history", () => {
+  const d = new Document();
+  d.load({ version: 1, nodes: [], edges: [] });
+  let origin = "";
+  d.onTransaction = (t) => {
+    origin = t.origin;
+  };
+  const bridge = createSceneBridge(
+    {
+      loadScene: (s) => {
+        d.load(s);
+      },
+      exportScene: () => d.snapshot(),
+      applyChanges: (ops, opts) => d.apply(ops, opts),
+    },
+    "session",
+  );
+  const response = bridge.handle(
+    request("applyChanges", {
+      operations: [
+        {
+          kind: "put",
+          node: {
+            id: "a",
+            type: "text",
+            title: "a",
+            x: 0,
+            y: 0,
+            width: 100,
+            height: 100,
+          },
+        },
+      ],
+      options: { origin: "remote", history: false, transactionId: "server-id" },
+    }),
+  );
+  expect(response.ok).toBe(true);
+  expect(origin).toBe("remote");
+  expect(d.canUndo).toBe(false);
+});
+it("supports optional native selection/preview commands without exposing service operations", () => {
+  let ids: string[] = [];
+  let preview = {
+    execute: [] as string[],
+    blocked: [] as string[],
+    cancel: [] as string[],
+  };
+  const bridge = createSceneBridge(
+    {
+      loadScene() {},
+      exportScene: () => ({ version: 1, nodes: [], edges: [] }),
+      applyChanges() {},
+      getSelection: () => ({ nodeIds: ids }),
+      setSelection: (v) => {
+        ids = [...v];
+      },
+      setExecutionPreview: (v) => {
+        preview = {
+          execute: [...(v?.execute ?? [])],
+          blocked: [...(v?.blocked ?? [])],
+          cancel: [...(v?.cancel ?? [])],
+        };
+      },
+    },
+    "session",
+  );
+  expect(bridge.handle(request("setSelection", ["a"])).ok).toBe(true);
+  expect(
+    bridge.handle({ ...request("getSelection"), requestId: "2" }).data,
+  ).toEqual({ nodeIds: ["a"] });
+  expect(
+    bridge.handle({
+      ...request("setExecutionPreview", { cancel: ["a"] }),
+      requestId: "3",
+    }).ok,
+  ).toBe(true);
+  expect(preview.cancel).toEqual(["a"]);
+  expect(
+    bridge.handle({ ...request("setSelection", [7]), requestId: "4" }).error
+      ?.code,
+  ).toBe("INVALID_REQUEST");
+  expect(
+    bridge.handle({ ...request("charge", {}), requestId: "5" }).error?.code,
+  ).toBe("INVALID_REQUEST");
+});

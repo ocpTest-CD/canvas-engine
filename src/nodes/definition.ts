@@ -1,4 +1,4 @@
-import type { Node } from "../core/types";
+import type { Node } from "../core/types.js";
 export interface NodeEditor {
   element: HTMLElement;
   dispose?: () => void;

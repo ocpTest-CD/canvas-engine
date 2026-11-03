@@ -1,6 +1,6 @@
 import { Texture } from "pixi.js";
-import type { MediaMetadata } from "../core/types";
-import { mediaPreview } from "./media";
+import type { MediaMetadata } from "../core/types.js";
+import { mediaPreview } from "./media.js";
 export interface Asset {
   url: string;
   mime: string;
@@ -8,6 +8,8 @@ export interface Asset {
 }
 export interface AssetContext {
   signal: AbortSignal;
+  purpose?: "thumbnail" | "preview" | "original";
+  version?: string;
 }
 export type AssetResolver = (
   id: string,
@@ -105,7 +107,7 @@ export class Resources {
         this.config.timeoutMs,
       );
       const work = Promise.resolve()
-        .then(() => this.resolve(id, { signal }))
+        .then(() => this.resolve(id, { signal, purpose: "thumbnail" }))
         .then(async (asset) => {
           if (!this.alive || signal.aborted || this.entries.get(id) !== e) {
             asset.release?.();

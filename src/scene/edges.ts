@@ -1,6 +1,6 @@
 import RBush from "rbush";
-import type { Edge, Node } from "../core/types";
-import type { Box } from "./geometry";
+import type { Edge, Node } from "../core/types.js";
+import type { Box } from "./geometry.js";
 /** Rectangles include crossing edges with both endpoints outside the viewport. */
 export class EdgeIndex {
   private tree = new RBush<Box>();

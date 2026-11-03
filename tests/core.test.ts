@@ -50,9 +50,11 @@ describe("document transactions", () => {
     d.apply([{ kind: "put", node: node("a", 100) }]);
     d.updateStatus("a", "done");
     d.undo();
-    expect(d.nodes.get("a")).toMatchObject({ x: 0, status: "done" });
+    expect(d.nodes.get("a")).toMatchObject({ x: 0 });
+    expect(d.runtime.get("a")?.status).toBe("done");
     d.redo();
-    expect(d.nodes.get("a")).toMatchObject({ x: 100, status: "done" });
+    expect(d.nodes.get("a")).toMatchObject({ x: 100 });
+    expect(d.runtime.get("a")?.status).toBe("done");
   });
   it("supports reversible stacking order", () => {
     const d = new Document();

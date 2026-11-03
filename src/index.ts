@@ -1,9 +1,9 @@
 /** Public entry point. Hosts and examples must not import implementation files. */
-export { CanvasEngine } from "./engine";
-export type { Options } from "./engine";
-export { Document } from "./document/model";
-export * from "./core/types";
-export { validate } from "./serialization/scene";
+export { CanvasEngine } from "./engine.js";
+export type { Options } from "./engine.js";
+export { Document } from "./document/model.js";
+export * from "./core/types.js";
+export { validate } from "./serialization/scene.js";
 export {
   toScreen,
   toWorld,
@@ -11,27 +11,29 @@ export {
   pinchCamera,
   SpatialIndex,
   segmentDistance,
-} from "./scene/geometry";
+} from "./scene/geometry.js";
 export type {
   NodeDefinition,
   NodeAction,
   NodeEditor,
-} from "./nodes/definition";
+} from "./nodes/definition.js";
 export type {
   Asset,
   AssetResolver,
   AssetContext,
   ResourceOptions,
-} from "./resources/resources";
-export { fitMedia, fitText } from "./layout/sizing";
+} from "./resources/resources.js";
+export { fitMedia, fitText } from "./layout/sizing.js";
 
-export type { DocumentChange, DocumentOptions } from "./document/model";
+export type { DocumentChange, DocumentOptions } from "./document/model.js";
 
-export { createSceneBridge } from "./core/bridge";
+export { createSceneBridge } from "./core/bridge.js";
 export type {
   SceneBridge,
   SceneBridgeHost,
   BridgeMethod,
   BridgeRequest,
   BridgeResponse,
-} from "./core/bridge";
+} from "./core/bridge.js";
+
+export { selectionSnapshot, executionPreview } from "./core/selection.js";

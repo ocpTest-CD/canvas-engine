@@ -68,7 +68,7 @@ describe("incremental document transactions", () => {
     const onChange = vi.fn();
     d.onChange = onChange;
     d.updateStatus("a", "done");
-    expect(onChange.mock.lastCall?.[1].geometry.size).toBe(0);
+    expect(onChange).not.toHaveBeenCalled();
     d.apply([{ kind: "put", node: { ...d.nodes.get("a")!, text: "new" } }]);
     expect(onChange.mock.lastCall?.[1].orderChanged).toBe(false);
     expect(onChange.mock.lastCall?.[1].geometry.size).toBe(0);

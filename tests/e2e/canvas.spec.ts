@@ -320,9 +320,9 @@ test("100 mixed nodes, plugin activation and repeated independent engine disposa
   expect(
     await page.evaluate(
       () =>
-        [...window.canvasEngine!.document.nodes.values()].find(
+        window.canvasEngine!.document.runtime.get([...window.canvasEngine!.document.nodes.values()].find(
           (n) => n.type === "custom",
-        )!.status,
+        )!.id)?.status,
     ),
   ).toBe("activated");
   await page.evaluate(() => {
@@ -368,4 +368,55 @@ test("100 mixed nodes, plugin activation and repeated independent engine disposa
     return true;
   });
   expect(result).toBe(true);
+});
+
+test("persistent execution controls are viewport-only and progress never mutates scenes or renders continuously", async ({page}) => {
+  await ready(page);
+  await page.evaluate(() => {
+    const e=window.canvasEngine!;
+    e.loadScene({version:1,nodes:[{id:"active",type:"text",title:"执行测试",x:100,y:100,width:260,height:180},{id:"offscreen",type:"text",title:"远处",x:99999,y:99999,width:260,height:180}],edges:[],camera:{x:0,y:0,zoom:1}});
+    e.options.nodePrimaryAction=n=>({id:"run",label:"执行节点",run:()=>{e.setRuntimeState(n.id,{runId:"test",active:true,status:"running",phase:"生成中",progress:.42,startedAt:Date.now()});}});
+    e.requestRender();
+  });
+  await expect(page.getByRole("button",{name:"执行节点：执行测试",exact:true})).toBeVisible();
+  await expect(page.locator(".engine-node-run")).toHaveCount(1);
+  await page.getByRole("button",{name:"执行节点：执行测试",exact:true}).click();
+  await expect(page.locator(".engine-node-progress")).toHaveAttribute("aria-valuenow","42");
+  await expect(page.locator(".engine-node-progress-label")).toContainText("42%");
+  expect(await page.evaluate(()=>JSON.stringify(window.canvasEngine!.exportScene()))).not.toContain('"progress"');
+  await page.mouse.move(1300,900);
+  await page.waitForTimeout(350);
+  const frames=await page.evaluate(()=>window.canvasEngine!.metrics.frames);
+  await page.waitForTimeout(1200);
+  expect(await page.evaluate(()=>window.canvasEngine!.metrics.frames)).toBe(frames);
+  await page.evaluate(()=>window.canvasEngine!.setRuntimeState("active",{active:true,phase:"生成中"}));
+  await expect(page.locator(".engine-node-progress")).not.toHaveAttribute("aria-valuenow");
+  await page.evaluate(()=>{const e=window.canvasEngine!;e.camera.x=50000;e.requestRender();});
+  await expect(page.locator(".engine-node-run")).toHaveCount(0);
+  await page.evaluate(()=>window.canvasEngine!.destroy());
+  await expect(page.locator(".engine-execution-controls")).toHaveCount(0);
+});
+
+test('inline titles rename every node type atomically with IME, cancel and read-only guards', async ({page})=>{
+  await ready(page);
+  await page.evaluate(()=>window.canvasEngine!.loadScene({version:1,nodes:['text','image','video','audio','generate:text','generate:image','generate:video','tool:custom'].map((type,i)=>({id:String(i),type,title:`类型 ${i}`,x:100+(i%4)*300,y:180+Math.floor(i/4)*250,width:220,height:150})),edges:[],camera:{x:0,y:0,zoom:1}}));
+  for(let i=0;i<8;i++){
+    await page.getByRole('button',{name:`重命名：类型 ${i}`,exact:true}).click();
+    const editor=page.getByRole('textbox',{name:'节点名称',exact:true});
+    await editor.fill(`新名称 ${i}`);await editor.press('Enter');
+    await expect(page.getByRole('button',{name:`重命名：新名称 ${i}`,exact:true})).toBeVisible();
+  }
+  await page.evaluate(()=>window.canvasEngine!.document.undo());
+  await expect(page.getByRole('button',{name:'重命名：类型 7',exact:true})).toBeVisible();
+  await page.getByRole('button',{name:'重命名：类型 7',exact:true}).click();
+  const editor=page.getByRole('textbox',{name:'节点名称',exact:true});
+  await editor.fill('取消的名称');await editor.press('Escape');
+  await expect(page.getByRole('button',{name:'重命名：类型 7',exact:true})).toBeVisible();
+  await page.getByRole('button',{name:'重命名：类型 7',exact:true}).click();
+  await editor.fill('中文输入中');await editor.dispatchEvent('keydown',{key:'Enter',isComposing:true});
+  await expect(editor).toBeVisible();await editor.press('Enter');
+  await page.evaluate(()=>{const e=window.canvasEngine!;e.options.readOnly=true;e.requestRender();});
+  await expect(page.locator('.engine-title-target')).toHaveCount(0);
+  await page.evaluate(()=>{const e=window.canvasEngine!;e.options.readOnly=false;e.loadScene({version:1,nodes:[],edges:[]});});
+  await expect(editor).toHaveCount(0);
 });

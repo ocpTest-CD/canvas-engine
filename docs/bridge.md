@@ -80,3 +80,9 @@ const bridge = createSceneBridge({
 ```
 
 已验证消息往返、重复请求、旧会话、错误操作、超限、缓存淘汰和销毁；浏览器内与真实 CanvasEngine 联动通过三引擎回归。尚未在 Swift/Kotlin 宿主或移动真机完成 transport 验收。
+
+## 0.4 远端同步 envelope
+
+`applyChanges` 仍接受旧的数组 payload，也接受 `{operations: Change[], options: {origin:"remote",history:false,transactionId:"server-tx"}}`。宿主 SceneBridgeHost.applyChanges 必须转发第二参数给 engine.applyChanges，才能避免把远端更新再次作为本地编辑发送。桥接 session/request ID 仍只是本地传输重放控制，不替代服务器 revision/幂等协议。
+
+0.5 追加可选 getSelection/setSelection/getExecutionPreview/setExecutionPreview；旧必需方法不变。具体 payload 与前置条件见 [选区桥接](execution-selection.md)。

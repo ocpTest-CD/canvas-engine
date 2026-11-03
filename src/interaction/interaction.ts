@@ -1,11 +1,11 @@
-import type { InteractionHost } from "./host";
-import { uid, type Point, type Node, type Camera } from "../core/types";
+import type { InteractionHost } from "./host.js";
+import { uid, type Point, type Node, type Camera } from "../core/types.js";
 import {
   toWorld,
   zoomAt,
   segmentDistance,
   pinchCamera,
-} from "../scene/geometry";
+} from "../scene/geometry.js";
 type Gesture = {
   mode: "pan" | "drag" | "resize" | "box" | "connect";
   start: Point;
@@ -30,11 +30,11 @@ export class Interaction {
     h.addEventListener("pointerdown", this.down, { signal });
     h.addEventListener("pointermove", this.move, { signal });
     h.addEventListener("pointerleave", () => e.hoverNode(), { signal });
-    h.addEventListener("pointerup", this.up, { signal });
+    h.addEventListener("pointerup", ev => { try { this.up(ev); } catch (error) { this.cancel(); e.message(error instanceof Error ? error.message : String(error)); } }, { signal });
     h.addEventListener("pointercancel", this.cancel, { signal });
     h.addEventListener("dblclick", this.double, { signal });
     h.addEventListener("wheel", this.wheel, { signal, passive: false });
-    h.addEventListener("keydown", this.key, { signal });
+    h.addEventListener("keydown", ev => { try { this.key(ev); } catch (error) { ev.preventDefault(); e.message(error instanceof Error ? error.message : String(error)); } }, { signal });
     h.addEventListener(
       "keyup",
       (ev) => {
@@ -82,7 +82,10 @@ export class Interaction {
     let from: string | undefined;
     if (this.space || ev.button === 1 || (ev.pointerType === "touch" && !n))
       mode = "pan";
-    else if (n) {
+    else if (n && (e.options.readOnly || e.document.isNodeLocked(n.id))) {
+      e.selected = new Set([n.id]);
+      mode = "pan";
+    } else if (n) {
       const tolerance = 10 / e.camera.zoom;
       if (
         e.definitions.get(n.type)?.ports?.output !== false &&
@@ -104,6 +107,10 @@ export class Interaction {
         if (n.group)
           for (const other of e.document.nodes.values())
             if (other.group === n.group) e.selected.add(other.id);
+        if ([...e.selected].some(id => e.document.isNodeLocked(id))) {
+          e.message("节点执行中，请先取消执行再修改");
+          return;
+        }
         mode =
           e.selected.size === 1 &&
           p.x > n.x + n.width - tolerance &&
@@ -337,6 +344,15 @@ export class Interaction {
       return;
     const e = this.e,
       mod = ev.metaKey || ev.ctrlKey;
+    if (
+      e.options.readOnly &&
+      ((mod && ["d", "v", "z"].includes(ev.key.toLowerCase())) ||
+        ["Delete", "Backspace", "Enter", "F2"].includes(ev.key) ||
+        ev.key.startsWith("Arrow"))
+    ) {
+      ev.preventDefault();
+      return;
+    }
     let handled = true;
     if (ev.code === "Space") {
       this.space = true;
@@ -352,7 +368,8 @@ export class Interaction {
       e.focusNodeControls();
     } else if (mod && ev.key.toLowerCase() === "z") {
       this.cancel();
-      ev.shiftKey ? e.document.redo() : e.document.undo();
+      if (!e.options.readOnly)
+        ev.shiftKey ? e.document.redo() : e.document.undo();
     } else if (mod && ev.key.toLowerCase() === "a") {
       e.selected = new Set(e.document.nodes.keys());
     } else if (mod && ev.key.toLowerCase() === "d") {

@@ -1,4 +1,4 @@
-import type { MediaMetadata } from "../core/types";
+import type { MediaMetadata } from "../core/types.js";
 export interface MediaPreview {
   canvas: HTMLCanvasElement;
   metadata: MediaMetadata;

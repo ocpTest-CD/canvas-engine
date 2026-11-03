@@ -1,4 +1,4 @@
-# 接入指南（0.3.0）
+# 接入指南（0.6.3）
 
 适用对象：有 DOM 的 Web/WebView 产品，以及只使用文档核心的 JavaScript 宿主。先阅读[平台前置条件](platforms.md)。纯原生 Swift/Kotlin/Flutter 不能直接实例化当前 `CanvasEngine`。
 
@@ -13,12 +13,12 @@ npm run build:engine
 npm pack
 ```
 
-构建基线为 Node.js 22；锁文件固定开发依赖。生成的包名预计为 `canvas-app-engine-0.3.0.tgz`，以 `npm pack` 实际输出为准。仓库地址为 https://github.com/ocpTest-CD/canvas-engine；代码采用 [MIT 许可证](../LICENSE)，第三方依赖保留各自许可证。
+构建基线为 Node.js 22；锁文件固定开发依赖。生成的包名预计为 `canvas-app-engine-0.6.3.tgz`，以 `npm pack` 实际输出为准。仓库地址为 https://github.com/ocpTest-CD/canvas-engine；代码采用 [MIT 许可证](../LICENSE)，第三方依赖保留各自许可证。
 
 在有 ESM/CSS 支持的接入方工程中，安装本地包：
 
 ```sh
-npm install /absolute/path/to/canvas-app-engine-0.3.0.tgz pixi.js@8.22.0 rbush@4.0.1
+npm install /absolute/path/to/canvas-app-engine-0.6.3.tgz pixi.js@8.22.0 rbush@4.0.1
 # 仅 React 使用方需要：
 npm install react@19 react-dom@19
 ```
@@ -156,3 +156,21 @@ Next.js/Nuxt 等 SSR 产品将 Web 引擎导入和实例化放在客户端生命
 至少完成：创建/卸载、文本及中文输入、增删改和撤销、连线限制、保存重开、图片横竖比例、实际视频编码播放、资源缺失、快速切换场景、窗口变化、键盘焦点和错误恢复。随后按目标硬件测性能。原生端还必须完成[平台验收](platforms.md)，不能只用浏览器桌面测试替代。
 
 跨 WebView 的结构化读写可使用 [createSceneBridge](bridge.md)；原生文件、资源与认证仍在宿主中。
+
+## 0.4 接入增量
+
+事务、运行状态、资源与只读模式以及 updateStatus 迁移见 [后端接入](backend-integration.md)。旧版示例中的 Node.status 只表示历史持久字段，最新运行状态读取 document.runtime。
+
+### 底部工具栏避让
+
+宿主可在创建引擎前设置 `.engine-host { --canvas-overlay-bottom-inset: 64px; }`，为屏幕空间参数面板预留底部区域。默认 16px，创建时读取；不改变节点几何、文档边界或媒体尺寸。
+
+## 0.6.1 原位重命名
+
+Web/Electron/WebView 宿主加载引擎 CSS 后，点击节点上方标题即可编辑。回车或失焦提交，Esc 取消，空白名称保留原值，最长 200 字符；中文输入法确认不会提前提交。标题通过 `patch` 事务进入撤销、保存和远端同步，无需新增 API。宿主参数面板应移除重复的标题输入框。
+
+所有节点类型共用此行为；只读模式不显示可编辑目标。目标仅为视口内且 zoom>0.32 的节点创建，低倍率需放大再编辑。此能力属于 DOM/Web 渲染器，不代表 headless 或 Swift/Kotlin 原生控件已经实现。切换场景、只读或销毁会取消未提交的名称草稿。
+
+## 0.6.2 执行锁
+
+活动 runtime 默认锁定本地节点编辑；宿主配置控件检查 `document.isNodeLocked(id)`，生成结果以 `origin: "system"` 写入。完整行为与接入迁移见 [节点执行控件](execution-controls.md#062-活动节点锁定契约)。

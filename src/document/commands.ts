@@ -1,5 +1,5 @@
-import { uid, type Node, type Snapshot, type Change } from "../core/types";
-import type { Document } from "./model";
+import { uid, type Node, type Snapshot, type Change } from "../core/types.js";
+import type { Document } from "./model.js";
 interface CommandHost {
   document: Document;
   selected: Set<string>;
