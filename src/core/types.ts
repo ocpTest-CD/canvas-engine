@@ -88,7 +88,11 @@ export interface CommittedTransaction {
   revision: number;
   operations: Change[];
 }
+export interface RuntimeIssue {
+  id: string; summary: string; detail?: string; severity?: "error" | "blocked" | "attention";
+}
 export interface RuntimeState {
+  issue?: RuntimeIssue;
   status?: string;
   /** Actual stage progress, normalized to 0..1. Omit when unknown. */
   progress?: number;

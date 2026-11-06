@@ -1,4 +1,4 @@
-# API 参考（0.6.3）
+# API 参考（0.7.0）
 
 本页以当前源码为准，不包含规划接口。导出的完整 TypeScript 声明随构建产物提供。0.x 尚无跨小版本稳定保证；不要导入内部 src 路径。
 
@@ -183,3 +183,30 @@ interface NodeDefinition {
 ## 0.6.2 执行锁
 
 活动 runtime 默认锁定本地节点编辑；宿主配置控件检查 `document.isNodeLocked(id)`，生成结果以 `origin: "system"` 写入。完整行为与接入迁移见 [节点执行控件](execution-controls.md#062-活动节点锁定契约)。
+
+## 0.7：节点执行错误呈现
+
+`RuntimeIssue` 为通用显示数据，不包含模型、凭据或后端依赖。宿主须提供已经脱敏的错误；引擎不会解读模型能力，也不会自动发出请求。
+
+```ts
+const engine = await CanvasEngine.create(host, {
+  onNodeIssue(node, issue) {
+    // 宿主打开自己的详情弹窗；Web/Electron 可用 dialog，原生壳可转发 bridge 消息。
+    openErrorDetails(node.id, issue);
+  },
+});
+engine.setRuntimeState(nodeId, {
+  active: false,
+  issue: { id: `${runId}:${nodeId}:invalid_parameters`, severity: 'error',
+    summary: '视频时长不符合要求', detail: '请从当前模型支持的时长中选择。' },
+});
+// 新运行必须替换旧运行态，结束或校验通过时清理 issue 和 error。
+engine.setRuntimeState(nodeId, { active: false });
+```
+
+- `severity` 支持 `error` / `blocked` / `attention`；错误红色，下游阻断或结果未知使用琥珀色，并有文字提示。
+- 摘要位于节点内部右上角；长文字省略，缩放 ≤ 0.32 或屏幕宽度 < 130px 时显示 `!`，完整摘要保留于 title/aria-label。
+- 只为视口节点创建 DOM；运行期间进度遮罩优先，不启动错误闪烁或持续渲染循环。
+- `RuntimeState.error` 旧字符串仍可显示；宿主可使用 SDK 0.4 归一化为中文、脱敏后的结构化详情。
+- 只读画布仍可查看错误。错误属于临时运行态，不序列化到 scene v1；持久历史由服务端/宿主管理。
+- Bridge 的现有 `setRuntimeState` 可透传 issue，无需新方法。纯 core 宿主读取数据自行绘制，Web 层提供上述交互；原生壳仍需既有 WebView/消息桥前置条件。

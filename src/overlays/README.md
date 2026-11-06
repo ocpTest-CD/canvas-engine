@@ -13,3 +13,5 @@
 执行控件接入示例、LOD 与平台约束见 `docs/execution-controls.md`。
 
 `titles.ts`：原位标题命中和瞬时输入框，管理 Enter/blur/Escape/IME 生命周期。只提交标题 patch；不修改节点类型、模型配置或媒体。loadScene/setReadOnly 同步清除旧命中区，避免渲染前的旧目标误接收点击。
+
+- `issues.ts`：按视口定位错误边框、摘要与宿主回调；不负责校验规则、错误详情弹窗或执行。

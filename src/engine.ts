@@ -33,10 +33,13 @@ import { Overlays } from "./overlays/overlays.js";
 import { Interaction } from "./interaction/interaction.js";
 import { NodeCommands } from "./document/commands.js";
 import { NodeTitles } from "./overlays/titles.js";
+import { NodeIssues } from "./overlays/issues.js";
+import type { RuntimeIssue } from "./core/types.js";
 import { ExecutionControls } from "./overlays/execution.js";
 import { Floating } from "./overlays/floating.js";
 import { fitMedia, fitText } from "./layout/sizing.js";
 export interface Options {
+  onNodeIssue?: (node: Node, issue: RuntimeIssue) => void;
   readOnly?: boolean;
   resolveAsset?: AssetResolver;
   resources?: ResourceOptions;
@@ -81,6 +84,7 @@ export class CanvasEngine {
   private panelCleanup?: () => void;
   readonly floating: Floating;
   private executionControls: ExecutionControls;
+  private issues: NodeIssues;
   private interactionLocks = new Set<string>();
   private titles: NodeTitles;
   resources: Resources;
@@ -148,6 +152,7 @@ export class CanvasEngine {
       if (!this.options.readOnly && !this.document.isNodeLocked(id) && current?.title === original)
         this.applyChanges([{ kind: "patch", id, set: { title } }]);
     });
+    this.issues = new NodeIssues(host);
     this.executionControls = new ExecutionControls(host, error => this.message(String(error)));
     this.floating = new Floating(
       host,
@@ -269,6 +274,7 @@ export class CanvasEngine {
         throw Error("连线不符合宿主规则");
     this.overlays.close(false);
     // Remove old screen-space targets synchronously before the next render.
+    this.issues.clear();
     this.titles.update([], this.camera, true);
     this.executionControls.update([], this.camera, this.document.runtime, undefined, true);
     this.floating.update(undefined, [], this.camera, undefined, true);
@@ -324,6 +330,7 @@ export class CanvasEngine {
     this.interaction?.cancel();
     this.overlays.close(false);
     // Remove old screen-space targets synchronously before the next render.
+    this.issues.clear();
     this.titles.update([], this.camera, true);
     this.executionControls.update([], this.camera, this.document.runtime, undefined, true);
     this.floating.update(undefined, [], this.camera, undefined, true);
@@ -727,6 +734,7 @@ export class CanvasEngine {
     );
     this.host.dataset.theme = this.dark ? "dark" : "light";
     this.titles.update(nodes.filter(n => !this.document.isNodeLocked(n.id)), c, !!this.options.readOnly || !!this.overlays.id || this.gestureActive);
+    this.issues.update(nodes, c, this.document.runtime, this.options.onNodeIssue, !this.host.clientWidth || !this.host.clientHeight);
     this.executionControls.update(nodes, c, this.document.runtime, this.options.readOnly ? undefined : this.options.nodePrimaryAction, !this.host.clientWidth || !this.host.clientHeight);
     this.metrics = {
       frames: this.metrics.frames + 1,
@@ -748,6 +756,7 @@ export class CanvasEngine {
     clearTimeout(this.hoverTimer);
     this.panelCleanup?.();
     this.floating.destroy();
+    this.issues.destroy();
     this.executionControls.destroy();
     this.titles.destroy();
     this.overlays.destroy();

@@ -1,4 +1,4 @@
-# 平台支持与接入前置条件（0.6.3）
+# 平台支持与接入前置条件（0.7.0）
 
 核对日期：2026-11-03。本引擎当前提供纯 JavaScript 数据核心和 DOM + PixiJS Web 渲染实现。跨端目标不等于所有平台已经交付 SDK；本页把可行接入路线与实际验收分开。
 
@@ -124,3 +124,5 @@ Node.js 可导入 `/core` 校验场景、编辑数据、计算坐标和媒体尺
 0.5 选区快照、执行预览和跨端桥接见 [执行接入](execution-selection.md)。
 
 0.6 的常驻执行控件是 Web DOM 层，可用于浏览器、React、Electron 和支持 DOM 的 WebView；原生宿主通过运行时状态自行实现原生 UI。控件不提供后台执行、供应商取消或持久队列。详见 [执行呈现](execution-controls.md)。
+
+0.7 的错误摘要按钮依赖 Web DOM 层；纯 core 消费者通过 RuntimeState.issue 自行绘制。WebView 原生壳用既有 bridge.setRuntimeState 透传，并由宿主处理 onNodeIssue；不增加模型服务或网络前置条件。

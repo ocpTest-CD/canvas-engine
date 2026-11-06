@@ -1,6 +1,6 @@
 # Canvas Engine 文档
 
-核对日期：2026-11-03。当前包 `@canvas-app/engine` **0.6.3**；场景协议 **version 1**；状态为 MIT 开源开发版本，尚未发布 npm；`private: true` 防止意外 npm 发布。版本来自 `package.json`，不是 npm 或 GitHub Release 记录。
+核对日期：2026-11-06。当前包 `@canvas-app/engine` **0.7.0**；场景协议 **version 1**；状态为 MIT 开源开发版本，尚未发布 npm；`private: true` 防止意外 npm 发布。版本来自 `package.json`，不是 npm 或 GitHub Release 记录。
 
 | 阅读目标 | 文档 |
 | --- | --- |
@@ -26,3 +26,5 @@
 - [0.6 节点执行控件](execution-controls.md)：常驻动作、runtime、性能/平台边界。
 
 [0.6.3 交付验收与迁移范围](quality-0.6.3.md)。
+
+0.7 新增节点执行问题显示，详见 API 与接入指南；0.6.3 性能和质量报告仅作为历史证据，本次没有重新跑性能基准。

@@ -25,7 +25,7 @@ App 便携项目 envelope、assets 和 appState 继续由宿主管理。引擎�
 事务、运行状态、资源与只读模式以及 updateStatus 迁移见 [后端接入](backend-integration.md)。旧版示例中的 Node.status 只表示历史持久字段，最新运行状态读取 document.runtime。
 
 
-## 从 0.3 升级到 0.6.3
+## 从 0.3 升级到 0.7.0
 
 - 场景格式仍为 version 1，已有节点/连线可继续加载。
 - `updateStatus` 更新独立 runtime，不写入 `node.status`；读取运行状态请改用 `engine.document.runtime.get(id)` 或 `runtimeChange`。

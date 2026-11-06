@@ -11,3 +11,5 @@
 0.4 同步相关行为见 [接入契约](../../docs/backend-integration.md)。修改需运行 tests/sync.test.ts 与跨语言 fixture；不把网络、账号或模型执行加入此模块。
 
 `selection.ts` 提供不可变选区快照和临时执行高亮数据，不做依赖展开、网络提交、扣费或审核。
+
+`RuntimeIssue` 是通用、非持久诊断数据，只携带显示文本与严重性；模型规则、脱敏、队列和详情 UI 属于 SDK/宿主。
